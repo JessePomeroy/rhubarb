@@ -31,7 +31,8 @@
       "./extensions/firecrawl/index.ts",
       "./extensions/subagents/index.ts",
       "./extensions/workflows/index.ts",
-      "./extensions/background-terminals/index.ts"
+      "./extensions/background-terminals/index.ts",
+      "./extensions/ask-user/index.ts"
     ],
     "skills": [
       "./skills/subagents",

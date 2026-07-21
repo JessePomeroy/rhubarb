@@ -20,8 +20,9 @@ This project is being built intentionally from pi's public extension APIs and do
 - `/btw` side-question agents
 - sandboxed ultracode workflows with structured outputs, background execution, artifacts, and `/workflows`
 - session-scoped background terminals with process-group cleanup and `/ps`
+- structured multiple-choice user questions with a free-form fallback
 
-Structured user questions, file search, and UI customization are planned next.
+File search and UI customization are planned next.
 
 ## Security
 
