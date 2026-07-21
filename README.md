@@ -19,8 +19,9 @@ This project is being built intentionally from pi's public extension APIs and do
 - `/subagents` management and takeover UI
 - `/btw` side-question agents
 - sandboxed ultracode workflows with structured outputs, background execution, artifacts, and `/workflows`
+- session-scoped background terminals with process-group cleanup and `/ps`
 
-Background terminals, structured user questions, file search, and UI customization are planned next.
+Structured user questions, file search, and UI customization are planned next.
 
 ## Security
 

@@ -30,11 +30,13 @@
     "extensions": [
       "./extensions/firecrawl/index.ts",
       "./extensions/subagents/index.ts",
-      "./extensions/workflows/index.ts"
+      "./extensions/workflows/index.ts",
+      "./extensions/background-terminals/index.ts"
     ],
     "skills": [
       "./skills/subagents",
-      "./skills/workflows"
+      "./skills/workflows",
+      "./skills/background-terminals"
     ]
   }
 }
