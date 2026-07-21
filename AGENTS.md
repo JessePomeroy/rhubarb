@@ -1,0 +1,33 @@
+# Global coding preferences
+
+## Package management
+
+- Add, update, and remove dependencies through the project's package manager instead of editing dependency manifests by hand.
+- Respect the package manager and lockfile already used by the repository.
+- Do not introduce a dependency when the platform or existing dependencies already provide a clear solution.
+
+## Validation
+
+- Run the relevant format, type-check, lint, and test commands after making changes.
+- If a project lacks useful validation commands, explain the gap and suggest an appropriate addition.
+- Report validation failures clearly; do not imply checks passed when they were not run.
+
+## TypeScript
+
+- Prefer type inference and narrow existing types rather than repeating explicit types.
+- Avoid explicit return types unless they improve an API boundary or solve an inference problem.
+- Do not use `any` as an escape hatch. Model the real type, validate unknown input, or use `unknown` with narrowing.
+- Preserve strict type safety at external-data and process boundaries.
+
+## Changes
+
+- Read relevant code and project instructions before editing.
+- Keep changes focused on the requested behavior and preserve unrelated user work.
+- Prefer small, reviewable edits over broad rewrites.
+- Follow the repository's existing conventions unless there is a clear reason to improve them.
+
+## Communication
+
+- Ask one question at a time when clarification is required.
+- Explain consequential design or security trade-offs before implementing them.
+- Be concise, but mention important assumptions and remaining risks.
