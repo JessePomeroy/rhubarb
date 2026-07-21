@@ -22,8 +22,9 @@ This project is being built intentionally from pi's public extension APIs and do
 - session-scoped background terminals with process-group cleanup and `/ps`
 - structured multiple-choice user questions with a free-form fallback
 - first-class `fd` and `rg` tools with verified portable binary fallback
+- a complete Catppuccin Mocha terminal theme
 
-UI customization is planned next.
+Footer, Git, and additional UI customization are planned next.
 
 ## Security
 

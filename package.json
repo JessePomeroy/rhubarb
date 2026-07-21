@@ -39,6 +39,9 @@
       "./skills/subagents",
       "./skills/workflows",
       "./skills/background-terminals"
+    ],
+    "themes": [
+      "./themes/catppuccin-mocha.json"
     ]
   }
 }
