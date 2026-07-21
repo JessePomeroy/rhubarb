@@ -14,7 +14,10 @@ export function prepareWorkflowSource(source: string) {
     if (statement.type === "ImportDeclaration") {
       throw new Error("Workflow scripts cannot import modules.");
     }
-    if (statement.type.startsWith("Export") && statement.type !== "ExportNamedDeclaration") {
+    if (
+      statement.type.startsWith("Export") &&
+      statement.type !== "ExportNamedDeclaration"
+    ) {
       throw new Error("Only `export const meta = {...}` is allowed.");
     }
     if (statement.type !== "ExportNamedDeclaration") continue;
@@ -29,7 +32,9 @@ export function prepareWorkflowSource(source: string) {
       declaration.declarations[0].id.type !== "Identifier" ||
       declaration.declarations[0].id.name !== "meta"
     ) {
-      throw new Error("Only one `export const meta = {...}` declaration is allowed.");
+      throw new Error(
+        "Only one `export const meta = {...}` declaration is allowed.",
+      );
     }
     foundMeta = true;
     const prefixStart = statement.start + offset;

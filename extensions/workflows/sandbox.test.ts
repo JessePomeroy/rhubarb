@@ -12,7 +12,9 @@ function run(source: string) {
     signal: controller.signal,
     onMeta() {},
     onPhase() {},
-    async onAgent(prompt) { return { ok: true, output: prompt.toUpperCase() }; },
+    async onAgent(prompt) {
+      return { ok: true, output: prompt.toUpperCase() };
+    },
   });
 }
 
@@ -27,7 +29,10 @@ test("workflow DSL runs phases, agents, parallel work, and args", async () => {
 });
 
 test("workflow source rejects imports", () => {
-  assert.throws(() => prepareWorkflowSource('import fs from "node:fs";'), /cannot import/);
+  assert.throws(
+    () => prepareWorkflowSource('import fs from "node:fs";'),
+    /cannot import/,
+  );
 });
 
 test("workflow sandbox has no process global", async () => {

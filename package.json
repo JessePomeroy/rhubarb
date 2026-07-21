@@ -6,8 +6,8 @@
   "scripts": {
     "check": "tsc --noEmit",
     "test": "node --test --experimental-strip-types extensions/**/*.test.ts",
-    "format": "prettier --write \"extensions/**/*.{ts,md}\" \"skills/**/*.md\" \"*.{json,md}\"",
-    "format:check": "prettier --check \"extensions/**/*.{ts,md}\" \"skills/**/*.md\" \"*.{json,md}\""
+    "format": "prettier --write \"extensions/**/*.{ts,md,cjs}\" \"skills/**/*.md\" \"*.{json,md}\"",
+    "format:check": "prettier --check \"extensions/**/*.{ts,md,cjs}\" \"skills/**/*.md\" \"*.{json,md}\""
   },
   "keywords": [],
   "type": "module",
@@ -29,10 +29,12 @@
   "pi": {
     "extensions": [
       "./extensions/firecrawl/index.ts",
-      "./extensions/subagents/index.ts"
+      "./extensions/subagents/index.ts",
+      "./extensions/workflows/index.ts"
     ],
     "skills": [
-      "./skills/subagents"
+      "./skills/subagents",
+      "./skills/workflows"
     ]
   }
 }
