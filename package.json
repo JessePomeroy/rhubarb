@@ -4,7 +4,10 @@
   "description": "A personal pi configuration for subagents, workflows, and web research",
   "main": "index.js",
   "scripts": {
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test": "node --test --experimental-strip-types extensions/**/*.test.ts",
+    "format": "prettier --write \"extensions/**/*.{ts,md}\" \"skills/**/*.md\" \"*.{json,md}\"",
+    "format:check": "prettier --check \"extensions/**/*.{ts,md}\" \"skills/**/*.md\" \"*.{json,md}\""
   },
   "keywords": [],
   "type": "module",
@@ -18,12 +21,17 @@
     "@earendil-works/pi-coding-agent": "^0.81.1",
     "@earendil-works/pi-tui": "^0.81.1",
     "@types/node": "^26.1.1",
+    "prettier": "^3.9.6",
     "typebox": "^1.3.6",
     "typescript": "^7.0.2"
   },
   "pi": {
     "extensions": [
-      "./extensions/firecrawl/index.ts"
+      "./extensions/firecrawl/index.ts",
+      "./extensions/subagents/index.ts"
+    ],
+    "skills": [
+      "./skills/subagents"
     ]
   }
 }

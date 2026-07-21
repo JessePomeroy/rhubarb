@@ -12,9 +12,14 @@ A personal, public [pi](https://pi.dev) configuration focused on:
 
 This project is being built intentionally from pi's public extension APIs and documentation. Features are added after deciding how they should fit this workflow rather than copying another setup wholesale.
 
-## Status
+## Included
 
-Early development. The current repository contains the base pi settings; extensions and setup instructions will be added incrementally.
+- Firecrawl web search, single-page scraping, and bounded site crawling
+- Asynchronous pi and Codex subagents
+- `/subagents` management and takeover UI
+- `/btw` side-question agents
+
+Reusable workflows, background terminals, structured user questions, file search, and UI customization are planned next.
 
 ## Security
 

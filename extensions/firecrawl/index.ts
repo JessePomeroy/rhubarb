@@ -30,7 +30,9 @@ function agentDirectory() {
 
 function parseEnvValue(contents: string, name: string) {
   for (const line of contents.split(/\r?\n/)) {
-    const match = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+    const match = line.match(
+      /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/,
+    );
     if (!match || match[1] !== name) continue;
 
     const value = match[2] ?? "";
@@ -69,16 +71,15 @@ async function client() {
 }
 
 function documentUrl(document: Document) {
-  return document.metadata?.sourceURL ?? document.metadata?.url ?? "unknown URL";
+  return (
+    document.metadata?.sourceURL ?? document.metadata?.url ?? "unknown URL"
+  );
 }
 
 function formatDocument(document: Document, index?: number) {
   const heading = index === undefined ? "" : `## ${index + 1}. `;
   const title = document.metadata?.title ?? documentUrl(document);
-  const parts = [
-    `${heading}${title}`,
-    `URL: ${documentUrl(document)}`,
-  ];
+  const parts = [`${heading}${title}`, `URL: ${documentUrl(document)}`];
 
   if (document.metadata?.description) {
     parts.push(`Description: ${document.metadata.description}`);
@@ -245,14 +246,17 @@ export default function firecrawlExtension(pi: ExtensionAPI) {
   pi.registerTool({
     name: "firecrawl_search",
     label: "Firecrawl Search",
-    description: "Search the web or news with Firecrawl. Returns links and result snippets.",
+    description:
+      "Search the web or news with Firecrawl. Returns links and result snippets.",
     promptSnippet: "Search the web or news using Firecrawl",
     promptGuidelines: [
       "Use firecrawl_search for current web research, then firecrawl_scrape only on results whose full content is needed.",
     ],
     parameters: Type.Object({
       query: Type.String({ minLength: 1, description: "Search query" }),
-      limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 20, default: 5 })),
+      limit: Type.Optional(
+        Type.Integer({ minimum: 1, maximum: 20, default: 5 }),
+      ),
       source: Type.Optional(
         StringEnum(["web", "news"] as const, { default: "web" }),
       ),
@@ -270,18 +274,25 @@ export default function firecrawlExtension(pi: ExtensionAPI) {
   pi.registerTool({
     name: "firecrawl_scrape",
     label: "Firecrawl Scrape",
-    description: "Extract readable Markdown and metadata from one web page with Firecrawl.",
+    description:
+      "Extract readable Markdown and metadata from one web page with Firecrawl.",
     promptSnippet: "Extract readable content from a web page using Firecrawl",
     parameters: Type.Object({
       url: Type.String({ format: "uri", description: "Public page URL" }),
       include_links: Type.Optional(
-        Type.Boolean({ default: false, description: "Include links discovered on the page" }),
+        Type.Boolean({
+          default: false,
+          description: "Include links discovered on the page",
+        }),
       ),
     }),
     async execute(_id, params) {
       const firecrawl = await client();
       const document = await firecrawl.scrape(params.url, {
-        formats: ["markdown", ...(params.include_links ? (["links"] as const) : [])],
+        formats: [
+          "markdown",
+          ...(params.include_links ? (["links"] as const) : []),
+        ],
         onlyMainContent: true,
       });
       return boundedOutput(formatDocument(document), "scrape");
@@ -293,12 +304,16 @@ export default function firecrawlExtension(pi: ExtensionAPI) {
     label: "Firecrawl Crawl",
     description:
       "Crawl multiple pages from a site with Firecrawl. Defaults to 10 pages and never exceeds 100.",
-    promptSnippet: "Crawl a bounded set of pages from a website using Firecrawl",
+    promptSnippet:
+      "Crawl a bounded set of pages from a website using Firecrawl",
     promptGuidelines: [
       "Use firecrawl_crawl only when multiple related pages are required; prefer firecrawl_scrape for a single URL.",
     ],
     parameters: Type.Object({
-      url: Type.String({ format: "uri", description: "Site or section URL to crawl" }),
+      url: Type.String({
+        format: "uri",
+        description: "Site or section URL to crawl",
+      }),
       limit: Type.Optional(
         Type.Integer({
           minimum: 1,
@@ -308,7 +323,11 @@ export default function firecrawlExtension(pi: ExtensionAPI) {
         }),
       ),
       max_depth: Type.Optional(
-        Type.Integer({ minimum: 0, maximum: 10, description: "Maximum link depth" }),
+        Type.Integer({
+          minimum: 0,
+          maximum: 10,
+          description: "Maximum link depth",
+        }),
       ),
       include_paths: Type.Optional(Type.Array(Type.String(), { maxItems: 20 })),
       exclude_paths: Type.Optional(Type.Array(Type.String(), { maxItems: 20 })),
@@ -324,7 +343,12 @@ export default function firecrawlExtension(pi: ExtensionAPI) {
         allowSubdomains: params.allow_subdomains ?? false,
         scrapeOptions: { formats: ["markdown"], onlyMainContent: true },
       });
-      const job: CrawlJob = await waitForCrawl(firecrawl, started.id, signal, onUpdate);
+      const job: CrawlJob = await waitForCrawl(
+        firecrawl,
+        started.id,
+        signal,
+        onUpdate,
+      );
       const text = [
         `# Crawl result\n\nStatus: ${job.status}\nPages: ${job.completed}\nCredits used: ${job.creditsUsed ?? "unknown"}`,
         ...job.data.map((document, index) => formatDocument(document, index)),
