@@ -26,9 +26,24 @@ This project is being built intentionally from pi's public extension APIs and do
 - lowercase `rhubarb` gradient header and a two-line model/context/Git dashboard footer
 - `/lg`, `/pr`, and cross-platform `/copy-all` convenience commands
 
+## Documentation
+
+- [Installation and recovery](SETUP.md)
+- [Architecture and usage](ARCHITECTURE.md)
+
+## Development
+
+```bash
+npm install
+npm run format:check
+npm run check
+npm test
+npm audit --omit=dev
+```
+
 ## Security
 
-Pi extensions execute with the current user's permissions. Credentials, sessions, environment files, and runtime state are excluded from version control.
+Pi extensions execute with the current user's permissions. Credentials, sessions, environment files, workflow artifacts, and runtime state are excluded from version control. Workflow orchestration JavaScript has an additional restricted child-process boundary described in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## License
 
