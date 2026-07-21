@@ -1,0 +1,27 @@
+# Credentials and local secrets
+auth.json
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Runtime and machine-local state
+sessions/
+trust.json
+models-store.json
+workflows/
+
+# Dependencies and generated binaries
+node_modules/
+bin/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
