@@ -21,8 +21,9 @@ This project is being built intentionally from pi's public extension APIs and do
 - sandboxed ultracode workflows with structured outputs, background execution, artifacts, and `/workflows`
 - session-scoped background terminals with process-group cleanup and `/ps`
 - structured multiple-choice user questions with a free-form fallback
+- first-class `fd` and `rg` tools with verified portable binary fallback
 
-File search and UI customization are planned next.
+UI customization is planned next.
 
 ## Security
 

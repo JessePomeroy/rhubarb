@@ -32,7 +32,8 @@
       "./extensions/subagents/index.ts",
       "./extensions/workflows/index.ts",
       "./extensions/background-terminals/index.ts",
-      "./extensions/ask-user/index.ts"
+      "./extensions/ask-user/index.ts",
+      "./extensions/file-search/index.ts"
     ],
     "skills": [
       "./skills/subagents",
