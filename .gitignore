@@ -10,7 +10,7 @@ auth.json
 sessions/
 trust.json
 models-store.json
-workflows/
+/workflows/
 
 # Dependencies and generated binaries
 node_modules/
