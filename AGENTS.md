@@ -19,6 +19,12 @@
 - Do not use `any` as an escape hatch. Model the real type, validate unknown input, or use `unknown` with narrowing.
 - Preserve strict type safety at external-data and process boundaries.
 
+## Svelte and SvelteKit
+
+- When creating, reviewing, or editing `.svelte` files or SvelteKit routes and server modules, load and follow the `svelte-best-practices` skill.
+- Prefer modern Svelte practices while respecting the project's installed version and existing runes or legacy style.
+- Do not perform unrelated framework migrations.
+
 ## Changes
 
 - Read relevant code and project instructions before editing.

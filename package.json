@@ -40,7 +40,8 @@
     "skills": [
       "./skills/subagents",
       "./skills/workflows",
-      "./skills/background-terminals"
+      "./skills/background-terminals",
+      "./skills/svelte-best-practices"
     ],
     "themes": [
       "./themes/catppuccin-mocha.json"
