@@ -23,8 +23,9 @@ This project is being built intentionally from pi's public extension APIs and do
 - structured multiple-choice user questions with a free-form fallback
 - first-class `fd` and `rg` tools with verified portable binary fallback
 - a complete Catppuccin Mocha terminal theme
+- lowercase `rhubarb` gradient header and a two-line model/context/Git dashboard footer
 
-Footer, Git, and additional UI customization are planned next.
+Git commands and clipboard helpers are planned next.
 
 ## Security
 
