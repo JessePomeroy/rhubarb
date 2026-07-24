@@ -10,8 +10,7 @@ A personal, public [pi](https://pi.dev) configuration focused on:
 - fast file and content search
 - a useful, compact terminal interface
 
-This project is being built intentionally from pi's public extension APIs and documentation. Features are added after deciding how they should fit this workflow rather than copying another setup wholesale.
-
+This project is being built intentionally from pi's public extension APIs and documentation. Mostly Ben Davis' workflow.
 ## Included
 
 - Firecrawl web search, single-page scraping, and bounded site crawling
