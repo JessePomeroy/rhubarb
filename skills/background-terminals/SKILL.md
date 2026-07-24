@@ -1,17 +1,29 @@
 ---
 name: background-terminals
-description: Run and manage long-lived shell commands in background terminals. Use for dev servers, watchers, streaming builds, and commands that should continue while the agent works.
+description: Run and manage long-lived shell commands in background terminals. Use for dev servers, watchers, streaming builds, and other commands that should keep running while the agent continues working.
 ---
 
-# Background terminals
+# Background Terminals
 
-Use `bg_start` for long-running commands and regular `bash` for quick commands.
+Use `bg_start` for long-running commands; use regular `bash` for quick commands.
 
-Background commands receive no stdin. Give each one a meaningful title and working directory, then continue useful work rather than polling repeatedly.
+## Start
 
-- `bg_status` inspects current status and output.
-- `bg_list` inventories the session's terminals.
-- `bg_kill` terminates a command and its process group.
-- `/ps` lets the user inspect and stop terminals interactively.
+Call `bg_start` with:
 
-Completion is delivered automatically. Output is bounded for model context; full output remains in the private spill path until session shutdown. All terminals are session-scoped and stop during shutdown or `/reload`.
+- `command`: shell command to run
+- `title`: short recognizable label
+- `working_dir`: project directory when different from the current directory
+
+Background commands receive no stdin. Never use them for interactive prompts.
+
+After starting, continue useful work instead of polling. The terminal sends one completion message when it exits.
+
+## Inspect and stop
+
+- Use `bg_status` only when current output or status is needed.
+- Use `bg_list` to inventory all tracked terminals.
+- Use `bg_kill` when a process is no longer needed or is stuck; termination continues even if the tool wait is aborted.
+- Tell the user they can open `/ps` to inspect live output and kill terminals interactively.
+
+Prefer meaningful titles and avoid starting duplicate servers or watchers. Full output is captured to spill files; tool and completion output shows a concise tail. Terminals are session-scoped and are stopped during shutdown or reload.

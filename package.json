@@ -41,7 +41,8 @@
       "./skills/subagents",
       "./skills/workflows",
       "./skills/background-terminals",
-      "./skills/svelte-best-practices"
+      "./skills/svelte-best-practices",
+      "./skills/slice-loop-workflow"
     ],
     "themes": [
       "./themes/catppuccin-mocha.json"

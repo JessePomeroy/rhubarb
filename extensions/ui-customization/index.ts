@@ -1,227 +1,261 @@
+import { homedir } from "node:os";
+import { relative } from "node:path";
 import type {
   ExtensionAPI,
   ExtensionContext,
+  ReadonlyFooterDataProvider,
 } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { basename } from "node:path";
-import { homedir } from "node:os";
+import {
+  getCapabilities,
+  hyperlink,
+  truncateToWidth,
+  visibleWidth,
+} from "@earendil-works/pi-tui";
+import {
+  emptyGitInfoState,
+  emptyModelInfoState,
+  GIT_INFO_CHANNEL,
+  MODEL_INFO_CHANNEL,
+  REFRESH_CHANNEL,
+  isGitInfoState,
+  isModelInfoState,
+} from "../shared/dashboard-state.ts";
 
-const ART = [
-  "      __          __               __",
-  " ____/ /_  __  __/ /_  ____ ______/ /_",
+interface RenderableNode {
+  children?: RenderableNode[];
+  invalidate(): void;
+  render(width: number): string[];
+}
+
+interface DashboardTui extends RenderableNode {
+  requestRender(force?: boolean): void;
+}
+
+const TITLE_LINES = [
+  "       __          __              __",
+  " _____/ /_  __  __/ /_  ____ _____/ /_",
   "/ ___/ __ \\/ / / / __ \\/ __ `/ ___/ __ \\",
   "/ /  / / / / /_/ / /_/ / /_/ / /  / /_/ /",
   "/_/  /_/ /_/\\__,_/_.___/\\__,_/_/  /_.___/",
 ];
-const GRADIENT = [
-  [203, 166, 247],
-  [245, 194, 231],
-  [250, 179, 135],
-  [249, 226, 175],
-  [166, 227, 161],
-  [137, 180, 250],
-] as const;
+const ANSI_PATTERN =
+  /[\u001B\u009B][[\]()#;?]*(?:(?:(?:[a-zA-Z\d]*(?:;[a-zA-Z\d]*)*)?\u0007)|(?:(?:\d{1,4}(?:;\d{0,4})*)?[\dA-PR-TZcf-nq-uy=><~]))/g;
 
-interface GitInfo {
-  branch?: string;
-  changed: number;
-  pr?: { number: number; url: string };
+function hasChildren(
+  component: RenderableNode,
+): component is RenderableNode & { children: RenderableNode[] } {
+  return Array.isArray(component.children);
 }
 
-export default function uiCustomizationExtension(pi: ExtensionAPI) {
-  let render: (() => void) | undefined;
-  let git: GitInfo = { changed: 0 };
-  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
-  let responseStartedAt: number | undefined;
-  let tokensPerSecond: number | undefined;
+function renderedText(component: RenderableNode) {
+  try {
+    return component.render(200).join("\n").replace(ANSI_PATTERN, "");
+  } catch {
+    return "";
+  }
+}
 
-  async function refreshGit(ctx: ExtensionContext) {
-    const branch = await pi.exec("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
-      cwd: ctx.cwd,
-      timeout: 3000,
-    });
-    if (branch.code !== 0) {
-      git = { changed: 0 };
-      render?.();
-      return;
+function hideThemesSection(component: RenderableNode) {
+  if (!hasChildren(component)) return false;
+
+  for (let index = 0; index < component.children.length; index += 1) {
+    const child = component.children[index]!;
+    const firstLine = renderedText(child)
+      .split("\n")
+      .find((line) => line.trim())
+      ?.trim();
+
+    if (firstLine === "[Themes]") {
+      const removeCount =
+        component.children[index + 1] &&
+        renderedText(component.children[index + 1]!).trim() === ""
+          ? 2
+          : 1;
+      component.children.splice(index, removeCount);
+      component.invalidate();
+      return true;
     }
-    const status = await pi.exec("git", ["status", "--porcelain"], {
-      cwd: ctx.cwd,
-      timeout: 3000,
-    });
-    const changed =
-      status.code === 0
-        ? status.stdout.split(/\r?\n/).filter(Boolean).length
-        : 0;
-    let pr: GitInfo["pr"];
-    const prResult = await pi
-      .exec("gh", ["pr", "view", "--json", "number,url"], {
-        cwd: ctx.cwd,
-        timeout: 3000,
-      })
-      .catch(() => undefined);
-    if (prResult?.code === 0) {
-      try {
-        const value = JSON.parse(prResult.stdout) as {
-          number?: unknown;
-          url?: unknown;
-        };
-        if (typeof value.number === "number" && typeof value.url === "string")
-          pr = { number: value.number, url: value.url };
-      } catch {}
-    }
-    git = { branch: branch.stdout.trim(), changed, pr };
-    render?.();
+
+    if (hideThemesSection(child)) return true;
   }
 
-  function scheduleGit(ctx: ExtensionContext) {
-    if (refreshTimer) clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(() => void refreshGit(ctx), 150);
+  return false;
+}
+
+function formatTokens(tokens: number) {
+  if (tokens < 1_000) return `${tokens}`;
+  if (tokens < 1_000_000) return `${Math.round(tokens / 1_000)}k`;
+  return `${(tokens / 1_000_000).toFixed(1)}m`;
+}
+
+function formatDirectory(cwd: string) {
+  const home = homedir();
+  if (cwd === home) return "~";
+  if (cwd.startsWith(`${home}/`)) return `~/${relative(home, cwd)}`;
+  return cwd;
+}
+
+function center(text: string, width: number) {
+  const padding = Math.max(0, Math.floor((width - visibleWidth(text)) / 2));
+  return truncateToWidth(`${" ".repeat(padding)}${text}`, width);
+}
+
+function columns(left: string, right: string, width: number) {
+  if (!right) return truncateToWidth(left, width);
+
+  const naturalGap = width - visibleWidth(left) - visibleWidth(right);
+  if (naturalGap >= 1) return `${left}${" ".repeat(naturalGap)}${right}`;
+
+  const leftWidth = Math.max(1, Math.floor(width * 0.45));
+  const rightWidth = Math.max(1, width - leftWidth - 1);
+  const fittedLeft = truncateToWidth(left, leftWidth);
+  const fittedRight = truncateToWidth(right, rightWidth);
+  const gap = Math.max(
+    1,
+    width - visibleWidth(fittedLeft) - visibleWidth(fittedRight),
+  );
+  return truncateToWidth(
+    `${fittedLeft}${" ".repeat(gap)}${fittedRight}`,
+    width,
+  );
+}
+
+export default function uiCustomization(pi: ExtensionAPI) {
+  let title = "pi";
+  let modelInfo = emptyModelInfoState();
+  let gitInfo = emptyGitInfoState();
+  let requestRender: (() => void) | undefined;
+  let activeTui: DashboardTui | undefined;
+  let themeRemovalTimers: Array<ReturnType<typeof setTimeout>> = [];
+
+  const stopModelListener = pi.events.on(MODEL_INFO_CHANNEL, (value) => {
+    if (!isModelInfoState(value)) return;
+    modelInfo = value;
+    requestRender?.();
+  });
+
+  const stopGitListener = pi.events.on(GIT_INFO_CHANNEL, (value) => {
+    if (!isGitInfoState(value)) return;
+    gitInfo = value;
+    requestRender?.();
+  });
+
+  function scheduleThemeRemoval(tui: DashboardTui) {
+    for (const timer of themeRemovalTimers) clearTimeout(timer);
+    themeRemovalTimers = [];
+
+    for (const delay of [0, 50, 250, 1_000]) {
+      themeRemovalTimers.push(
+        setTimeout(() => {
+          if (hideThemesSection(tui)) tui.requestRender(true);
+        }, delay),
+      );
+    }
+  }
+
+  function install(ctx: ExtensionContext) {
+    if (ctx.mode !== "tui") return;
+
+    ctx.ui.setHeader((tui, theme) => {
+      activeTui = tui;
+      requestRender = () => tui.requestRender();
+      scheduleThemeRemoval(tui);
+
+      return {
+        render(width: number) {
+          const art = TITLE_LINES.map((line) =>
+            center(theme.fg("accent", line), width),
+          );
+          const subtitle = center(theme.fg("muted", theme.bold(title)), width);
+          return ["", ...art, subtitle, ""];
+        },
+        invalidate() {},
+      };
+    });
+
+    ctx.ui.setFooter((tui, theme, footerData: ReadonlyFooterDataProvider) => {
+      requestRender = () => tui.requestRender();
+
+      return {
+        invalidate() {},
+        render(width: number) {
+          const directory = theme.fg("text", formatDirectory(ctx.cwd));
+          const fileLabel = gitInfo.changedFiles === 1 ? "file" : "files";
+          let git = gitInfo.branch
+            ? `${gitInfo.branch} · ${gitInfo.changedFiles} ${fileLabel} changed`
+            : "";
+
+          if (gitInfo.pullRequest) {
+            const prLabel = `PR #${gitInfo.pullRequest.number}`;
+            const linkedPr = getCapabilities().hyperlinks
+              ? hyperlink(prLabel, gitInfo.pullRequest.url)
+              : prLabel;
+            git += ` · ${linkedPr}`;
+          }
+
+          const contextPercent =
+            modelInfo.contextPercent === null
+              ? "?"
+              : `${Math.round(modelInfo.contextPercent)}`;
+          const contextWindow =
+            modelInfo.contextWindow > 0
+              ? formatTokens(modelInfo.contextWindow)
+              : "?";
+          const tps =
+            modelInfo.tokensPerSecond === null
+              ? "— tok/s"
+              : `${Math.round(modelInfo.tokensPerSecond)} tok/s`;
+          const usage = `${contextPercent}%/${contextWindow} · $${modelInfo.cost.toFixed(2)} · ${tps}`;
+          const model = modelInfo.provider
+            ? `${modelInfo.provider}/${modelInfo.modelId} · ${modelInfo.thinking}`
+            : modelInfo.modelId;
+
+          const lines = [
+            columns(directory, theme.fg("muted", model), width),
+            columns(theme.fg("muted", usage), theme.fg("muted", git), width),
+          ];
+
+          // Extension statuses render after the two dashboard lines, one per row.
+          const statuses = footerData.getExtensionStatuses();
+          const statusLines = Array.from(statuses.entries())
+            .sort(([a], [b]) => a.localeCompare(b))
+            .flatMap(([, text]) => text.split("\n"));
+          for (const statusLine of statusLines) {
+            lines.push(
+              truncateToWidth(statusLine, width, theme.fg("dim", "...")),
+            );
+          }
+
+          return lines;
+        },
+      };
+    });
+
+    ctx.ui.setTitle(`pi · ${title}`);
+    pi.events.emit(REFRESH_CHANNEL, undefined);
   }
 
   pi.on("session_start", (_event, ctx) => {
-    if (ctx.mode !== "tui") return;
-    scheduleGit(ctx);
-    ctx.ui.setTitle(`rhubarb · ${formatDirectory(ctx.cwd)}`);
-    ctx.ui.setHeader((tui) => {
-      render = () => tui.requestRender();
-      return {
-        render(width: number) {
-          return [
-            "",
-            ...ART.map((line, row) =>
-              center(gradient(line, row * 0.08), width),
-            ),
-            center(gradient("rhubarb", 0.35), width),
-            "",
-          ];
-        },
-        invalidate() {},
-      };
-    });
-    ctx.ui.setFooter((tui, theme, footerData) => {
-      render = () => tui.requestRender();
-      return {
-        render(width: number) {
-          const model = ctx.model
-            ? `${ctx.model.provider}/${ctx.model.id} · ${pi.getThinkingLevel()}`
-            : "no model";
-          const usage = ctx.getContextUsage();
-          const percent =
-            usage?.percent == null ? "?" : String(Math.round(usage.percent));
-          const window = formatTokens(ctx.model?.contextWindow ?? 0);
-          const cost = totalCost(ctx);
-          const speed =
-            tokensPerSecond === undefined
-              ? "— tok/s"
-              : `${Math.round(tokensPerSecond)} tok/s`;
-          const gitText = git.branch
-            ? `${git.branch} · ${git.changed} ${git.changed === 1 ? "file" : "files"} changed${git.pr ? ` · PR #${git.pr.number}` : ""}`
-            : "";
-          const lines = [
-            columns(
-              theme.fg("text", formatDirectory(ctx.cwd)),
-              theme.fg("muted", model),
-              width,
-            ),
-            columns(
-              theme.fg(
-                "muted",
-                `${percent}%/${window} · $${cost.toFixed(2)} · ${speed}`,
-              ),
-              theme.fg("muted", gitText),
-              width,
-            ),
-          ];
-          for (const [, status] of [...footerData.getExtensionStatuses()].sort(
-            ([a], [b]) => a.localeCompare(b),
-          )) {
-            for (const line of status.split("\n"))
-              lines.push(truncateToWidth(line, width, "…"));
-          }
-          return lines;
-        },
-        invalidate() {},
-      };
-    });
+    title = formatDirectory(ctx.cwd);
+    modelInfo = emptyModelInfoState();
+    gitInfo = emptyGitInfoState();
+    install(ctx);
   });
 
-  pi.on("message_start", (event) => {
-    if (event.message.role === "assistant") responseStartedAt = Date.now();
+  pi.on("resources_discover", () => {
+    if (activeTui) scheduleThemeRemoval(activeTui);
   });
-  pi.on("message_end", (event) => {
-    if (event.message.role !== "assistant" || responseStartedAt === undefined)
-      return;
-    const elapsed = (Date.now() - responseStartedAt) / 1000;
-    if (elapsed > 0 && event.message.usage?.output)
-      tokensPerSecond = event.message.usage.output / elapsed;
-    responseStartedAt = undefined;
-    render?.();
-  });
-  pi.on("model_select", () => render?.());
-  pi.on("thinking_level_select", () => render?.());
-  pi.on("tool_execution_end", (event, ctx) => {
-    if (["bash", "edit", "write"].includes(event.toolName)) scheduleGit(ctx);
-  });
+
   pi.on("session_shutdown", (_event, ctx) => {
-    if (refreshTimer) clearTimeout(refreshTimer);
-    refreshTimer = undefined;
-    render = undefined;
+    stopModelListener();
+    stopGitListener();
+    for (const timer of themeRemovalTimers) clearTimeout(timer);
+    themeRemovalTimers = [];
+    activeTui = undefined;
+    requestRender = undefined;
     if (ctx.mode === "tui") {
       ctx.ui.setHeader(undefined);
       ctx.ui.setFooter(undefined);
     }
   });
-}
-
-function totalCost(ctx: ExtensionContext) {
-  let total = 0;
-  for (const entry of ctx.sessionManager.getBranch()) {
-    if (entry.type !== "message" || entry.message.role !== "assistant")
-      continue;
-    total += entry.message.usage?.cost?.total ?? 0;
-  }
-  return total;
-}
-function formatDirectory(cwd: string) {
-  const home = homedir();
-  if (cwd === home) return "~";
-  if (cwd.startsWith(`${home}/`)) return `~/${cwd.slice(home.length + 1)}`;
-  return basename(cwd) || cwd;
-}
-function formatTokens(value: number) {
-  if (!value) return "?";
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}m`;
-  if (value >= 1000) return `${Math.round(value / 1000)}k`;
-  return String(value);
-}
-export function columns(left: string, right: string, width: number) {
-  const gap = width - visibleWidth(left) - visibleWidth(right);
-  if (gap >= 1) return `${left}${" ".repeat(gap)}${right}`;
-  return truncateToWidth(`${left} ${right}`, width, "…");
-}
-export function center(value: string, width: number) {
-  const pad = Math.max(0, Math.floor((width - visibleWidth(value)) / 2));
-  return truncateToWidth(`${" ".repeat(pad)}${value}`, width, "");
-}
-export function gradient(value: string, offset = 0) {
-  const chars = [...value];
-  return (
-    chars
-      .map((char, index) => {
-        const position =
-          chars.length <= 1
-            ? offset
-            : (index / (chars.length - 1) + offset) % 1;
-        const scaled = position * (GRADIENT.length - 1);
-        const start = Math.floor(scaled);
-        const end = Math.min(GRADIENT.length - 1, start + 1);
-        const amount = scaled - start;
-        const rgb = GRADIENT[start].map((channel, i) =>
-          Math.round(channel + (GRADIENT[end][i] - channel) * amount),
-        );
-        return `\x1b[38;2;${rgb[0]};${rgb[1]};${rgb[2]}m${char}`;
-      })
-      .join("") + "\x1b[0m"
-  );
 }

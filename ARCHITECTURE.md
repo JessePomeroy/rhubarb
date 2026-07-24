@@ -91,7 +91,7 @@ Both use argv-based process execution, bounded output, and private spill files.
 
 The Catppuccin Mocha theme styles messages, tools, Markdown, syntax, diffs, and thinking levels.
 
-The custom header displays lowercase gradient `rhubarb` art. The footer shows:
+The custom header displays lowercase old-school ASCII `rhubarb` art. The footer shows:
 
 - current directory;
 - provider/model and thinking level;
