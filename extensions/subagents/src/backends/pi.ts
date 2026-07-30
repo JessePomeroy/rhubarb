@@ -36,6 +36,7 @@ import type {
   TranscriptPart,
 } from "../domain.ts";
 import { SendError, SpawnError } from "../domain.ts";
+import { usageFromMessages } from "../../../shared/model-usage.ts";
 
 const CHILD_SHUTDOWN_TIMEOUT_MS = 5_000;
 const CHILD_TOOL_CALL_TIMEOUT_MS = 3 * 60 * 1_000;
@@ -427,12 +428,14 @@ const makePiSession = (
         _tag: "UsageChanged",
         tokens: usage?.tokens ?? undefined,
         contextWindow: activeModel()?.contextWindow ?? usage?.contextWindow,
+        modelUsage: usageFromMessages(session.messages),
       });
     };
 
     const settle = () => {
       if (state.settled) return;
       state.settled = true;
+      emitUsage();
       const last = lastAssistantMessage(session);
       const partialText = finalOutput(session) || undefined;
       if (last?.stopReason === "aborted") {
@@ -502,8 +505,11 @@ const makePiSession = (
             });
             emitUsage();
             emit({ _tag: "MetaChanged", meta: currentMeta() });
+          } else if (role === "toolResult") {
+            // Capture nested model work returned by child tools as soon as it
+            // is persisted on the child message.
+            emitUsage();
           }
-          // toolResult messages are covered by tool_execution_end.
           break;
         }
         case "tool_execution_start":

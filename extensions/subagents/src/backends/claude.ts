@@ -13,6 +13,7 @@ import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import type { Usage } from "@earendil-works/pi-ai";
 import {
   query,
   type SDKAssistantMessage,
@@ -455,13 +456,32 @@ const makeClaudeSession = (
     };
 
     const handleResult = (result: SDKResultMessage) => {
-      // result.usage is a whole-run aggregate, not occupancy (see
-      // contextOccupancyTokens); only the capacity is trustworthy here. The
-      // occupancy itself was already emitted by the last assistant message.
+      // result.usage is the cumulative billable usage for the SDK session. It
+      // is not context occupancy (see contextOccupancyTokens), but it is the
+      // correct source for local accounting.
       const contextWindow = resultContextWindow(result);
+      const input = result.usage.input_tokens;
+      const output = result.usage.output_tokens;
+      const cacheRead = result.usage.cache_read_input_tokens;
+      const cacheWrite = result.usage.cache_creation_input_tokens;
+      const modelUsage: Usage = {
+        input,
+        output,
+        cacheRead,
+        cacheWrite,
+        totalTokens: input + output + cacheRead + cacheWrite,
+        cost: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          total: result.total_cost_usd,
+        },
+      };
       emit({
         _tag: "UsageChanged",
         contextWindow: contextWindow ?? state.meta.contextWindow,
+        modelUsage,
       });
       if (
         contextWindow !== undefined &&

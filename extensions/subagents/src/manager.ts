@@ -11,6 +11,7 @@
  * and issue fire-and-forget commands without touching the Effect runtime.
  */
 
+import type { Usage } from "@earendil-works/pi-ai";
 import {
   Context,
   Effect,
@@ -41,6 +42,7 @@ import {
   SendError,
   SpawnError,
 } from "./domain.ts";
+import { hasModelUsage, subtractModelUsage } from "../../shared/model-usage.ts";
 
 export const MAX_RUNNING = 4;
 export const MAX_TRACKED = 64;
@@ -66,7 +68,9 @@ interface MutableSnapshot {
   settledAt?: number;
   errorText?: string;
   meta: SubagentMeta;
-  usage: { tokens?: number; contextWindow?: number };
+  usage: { tokens?: number; contextWindow?: number; modelUsage?: Usage };
+  runNumber: number;
+  lastRunUsage?: Usage;
   transcript: TranscriptItem[];
   liveAssistant?: { text: string; thinking: string };
   liveTools: LiveToolState[];
@@ -84,6 +88,8 @@ interface Entry {
   /** Idle restart dispatched but RunStarted not folded yet; counts as running
    * so concurrent restarts cannot race past the cap. */
   restarting?: boolean;
+  /** Cumulative child usage at the beginning of the current run. */
+  runUsageBaseline?: Usage;
 }
 
 // --- Read model ----------------------------------------------------------------
@@ -272,6 +278,10 @@ const makeManager = Effect.gen(function* () {
         s.finalText = outcome.partialText ?? "";
         break;
     }
+    const runUsage = s.usage.modelUsage
+      ? subtractModelUsage(s.usage.modelUsage, entry.runUsageBaseline)
+      : undefined;
+    s.lastRunUsage = hasModelUsage(runUsage) ? runUsage : undefined;
     s.liveAssistant = undefined;
     entry.liveToolMap.clear();
     s.liveTools = [];
@@ -292,9 +302,14 @@ const makeManager = Effect.gen(function* () {
     switch (event._tag) {
       case "RunStarted":
         entry.restarting = false;
+        if (s.status !== "running") {
+          s.runNumber++;
+          entry.runUsageBaseline = s.usage.modelUsage;
+        }
         s.status = "running";
         s.settledAt = undefined;
         s.errorText = undefined;
+        s.lastRunUsage = undefined;
         break;
       case "RunSettled":
         settle(entry, event.outcome);
@@ -352,6 +367,7 @@ const makeManager = Effect.gen(function* () {
         s.usage = {
           tokens: event.tokens ?? s.usage.tokens,
           contextWindow: event.contextWindow ?? s.usage.contextWindow,
+          modelUsage: event.modelUsage ?? s.usage.modelUsage,
         };
         break;
       case "MetaChanged":
@@ -426,6 +442,7 @@ const makeManager = Effect.gen(function* () {
             createdAt: Date.now(),
             meta,
             usage: { contextWindow: meta.contextWindow },
+            runNumber: 1,
             transcript: [],
             liveTools: [],
             queued: [],

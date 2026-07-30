@@ -7,6 +7,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import {
+  computeUsage,
   createFirstResponseWatchdog,
   guardWorkflowChildTools,
   recordToolExecutionTiming,
@@ -73,6 +74,28 @@ function parallelToolMessages(): AgentSession["messages"] {
     },
   ];
 }
+
+test("workflow usage includes nested tool model usage without double-counting", () => {
+  const messages = parallelToolMessages();
+  const nested = {
+    ...zeroUsage,
+    input: 12,
+    output: 3,
+    reasoning: 2,
+    totalTokens: 15,
+    cost: { ...zeroUsage.cost, total: 0.25 },
+  };
+  const toolResult = messages.find((message) => message.role === "toolResult");
+  if (toolResult?.role === "toolResult") toolResult.usage = nested;
+
+  const usage = computeUsage(messages);
+  assert.equal(usage.input, 12);
+  assert.equal(usage.output, 3);
+  assert.equal(usage.reasoning, 2);
+  assert.equal(usage.totalTokens, 15);
+  assert.equal(usage.cost, 0.25);
+  assert.equal(usage.turns, 1);
+});
 
 test("completed parallel tool calls pair lifecycle timings with calls and results", () => {
   const timings = new Map<string, ToolExecutionTiming>();

@@ -23,6 +23,7 @@
 
 import { randomBytes } from "node:crypto";
 import * as fs from "node:fs";
+import type { Usage } from "@earendil-works/pi-ai";
 import * as path from "node:path";
 import {
   getAgentDir,
@@ -55,6 +56,7 @@ import {
   statusColor,
   statusWord,
   SQUARE,
+  workflowUsageToModelUsage,
   type AgentRecord,
   type WorkflowDetails,
 } from "./model.ts";
@@ -76,6 +78,7 @@ import {
 } from "./runner.ts";
 import { runWorkflowSandbox } from "./sandbox.ts";
 import { safeStringify, writeFileAtomic } from "./serialization.ts";
+import { appendChildUsage, childUsageKey } from "../shared/usage-ledger.ts";
 
 const PREVIEW_LENGTH = 200;
 const EMIT_INTERVAL_MS = 120;
@@ -241,6 +244,41 @@ function runDetailText(
 }
 
 export default function workflows(pi: ExtensionAPI) {
+  /** Usage for blocking calls is attached in tool_result so failed executions
+   * (which must throw) still contribute to pi's built-in session totals. */
+  const pendingBlockingUsage = new Map<string, Usage>();
+  const recordedUsageRuns = new Set<string>();
+  let sessionActive = false;
+
+  const recordWorkflowUsage = (
+    details: WorkflowDetails,
+    reportedToParent: boolean,
+  ) => {
+    if (!sessionActive || recordedUsageRuns.has(details.runId)) return;
+    recordedUsageRuns.add(details.runId);
+    for (const agent of details.agents) {
+      appendChildUsage(pi, {
+        key: childUsageKey("workflow", details.runId, agent.index),
+        kind: "workflow",
+        sourceId: details.runId,
+        run: agent.index,
+        status: agent.state,
+        model: agent.model,
+        backend: "pi",
+        usage: workflowUsageToModelUsage(agent.usage),
+        reportedToParent,
+      });
+    }
+  };
+
+  pi.on("tool_result", (event) => {
+    if (event.toolName !== "workflow") return;
+    const usage = pendingBlockingUsage.get(event.toolCallId);
+    if (!usage) return;
+    pendingBlockingUsage.delete(event.toolCallId);
+    return { usage };
+  });
+
   /** Live background runs, for /workflows and shutdown cleanup. */
   const activeRuns = new Map<
     string,
@@ -287,6 +325,7 @@ export default function workflows(pi: ExtensionAPI) {
   };
 
   pi.on("session_start", (_event, ctx) => {
+    sessionActive = true;
     if (ctx.hasUI) lastUi = ctx.ui;
     updateIndicator();
   });
@@ -313,6 +352,8 @@ export default function workflows(pi: ExtensionAPI) {
     }
     lastUi?.setStatus("workflows", undefined);
     lastUi = undefined;
+    sessionActive = false;
+    pendingBlockingUsage.clear();
   });
 
   pi.registerCommand("workflows", {
@@ -372,7 +413,7 @@ export default function workflows(pi: ExtensionAPI) {
     promptGuidelines: WORKFLOW_PROMPT_GUIDELINES,
     parameters: WorkflowParams,
 
-    async execute(_toolCallId, params, signal, onUpdate, ctx) {
+    async execute(toolCallId, params, signal, onUpdate, ctx) {
       let prepared: ReturnType<typeof prepareWorkflowScript>;
       try {
         prepared = prepareWorkflowScript(params.script);
@@ -688,6 +729,7 @@ export default function workflows(pi: ExtensionAPI) {
           .finally(() => {
             activeRuns.delete(runId);
             recordSettledRun(details.status);
+            recordWorkflowUsage(details, false);
             updateIndicator();
             try {
               pi.sendUserMessage(
@@ -717,13 +759,22 @@ export default function workflows(pi: ExtensionAPI) {
         };
       }
 
+      let completionError: unknown;
       try {
         await completion;
+      } catch (error) {
+        completionError = error;
       } finally {
         activeRuns.delete(runId);
         recordSettledRun(details.status);
         updateIndicator();
       }
+      recordWorkflowUsage(details, true);
+      pendingBlockingUsage.set(
+        toolCallId,
+        workflowUsageToModelUsage(aggregateUsage(details.agents)),
+      );
+      if (completionError) throw completionError;
       if (details.status !== "completed") {
         // Pi marks tool failures only when execute throws; returning isError is
         // ignored by the extension API.

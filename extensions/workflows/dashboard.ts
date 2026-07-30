@@ -29,6 +29,7 @@ import {
 import {
   agentContext,
   countStates,
+  emptyUsage,
   formatElapsed,
   formatUsage,
   aggregateUsage,
@@ -135,13 +136,17 @@ function normalizeDetails(
           : undefined,
       preview: typeof a.preview === "string" ? a.preview : "",
       usage: {
-        input: 0,
-        output: 0,
-        cacheRead: 0,
-        cacheWrite: 0,
-        cost: 0,
-        turns: 0,
+        ...emptyUsage(),
         ...(a.usage && typeof a.usage === "object" ? (a.usage as object) : {}),
+        costDetails: {
+          ...emptyUsage().costDetails,
+          ...(a.usage &&
+          typeof a.usage === "object" &&
+          (a.usage as { costDetails?: unknown }).costDetails &&
+          typeof (a.usage as { costDetails?: unknown }).costDetails === "object"
+            ? ((a.usage as { costDetails: object }).costDetails as object)
+            : {}),
+        },
       },
       transcript: normalizeTranscript(a.transcript),
     });

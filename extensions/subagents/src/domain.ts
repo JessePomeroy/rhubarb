@@ -7,6 +7,7 @@
  * normalized `SubagentEvent` union.
  */
 
+import type { Usage } from "@earendil-works/pi-ai";
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import { Data } from "effect";
 
@@ -176,8 +177,11 @@ export type SubagentEvent =
     }
   | {
       readonly _tag: "UsageChanged";
+      /** Current context occupancy (not cumulative billing). */
       readonly tokens?: number;
       readonly contextWindow?: number;
+      /** Cumulative model usage for this child session. */
+      readonly modelUsage?: Usage;
     }
   | { readonly _tag: "MetaChanged"; readonly meta: Partial<SubagentMeta> }
   /** Non-fatal diagnostics. Fatal failures arrive as a RunSettled outcome. */
@@ -201,7 +205,15 @@ export interface SubagentSnapshot {
   readonly settledAt?: number;
   readonly errorText?: string;
   readonly meta: SubagentMeta;
-  readonly usage: { readonly tokens?: number; readonly contextWindow?: number };
+  readonly usage: {
+    readonly tokens?: number;
+    readonly contextWindow?: number;
+    readonly modelUsage?: Usage;
+  };
+  /** One-based run number for idle restarts of the same child session. */
+  readonly runNumber: number;
+  /** Usage attributable to the most recently settled run. */
+  readonly lastRunUsage?: Usage;
   readonly transcript: ReadonlyArray<TranscriptItem>;
   /** Streaming assistant buffers, cleared when the finalized message lands. */
   readonly liveAssistant?: { readonly text: string; readonly thinking: string };

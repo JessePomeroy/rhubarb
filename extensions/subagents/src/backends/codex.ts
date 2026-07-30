@@ -10,6 +10,7 @@
  */
 
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { calculateCost, type Usage } from "@earendil-works/pi-ai";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { Cause, Scope } from "effect";
@@ -211,9 +212,38 @@ function textInput(text: string) {
 export function parseThreadTokenUsage(params: unknown) {
   const usage = record(record(params)?.tokenUsage);
   const last = record(usage?.last);
+  const total = record(usage?.total);
+  const inputTokens = numberValue(total?.inputTokens);
+  const cachedInputTokens = numberValue(total?.cachedInputTokens) ?? 0;
+  const outputTokens = numberValue(total?.outputTokens);
+  const totalTokens = numberValue(total?.totalTokens);
+  const reasoning = numberValue(total?.reasoningOutputTokens);
+  const modelUsage: Usage | undefined =
+    inputTokens === undefined &&
+    outputTokens === undefined &&
+    totalTokens === undefined
+      ? undefined
+      : {
+          // Codex reports cached input as a subset of inputTokens. Pi's Usage
+          // keeps fresh input and cache-read tokens in separate buckets.
+          input: Math.max(0, (inputTokens ?? 0) - cachedInputTokens),
+          output: outputTokens ?? 0,
+          cacheRead: cachedInputTokens,
+          cacheWrite: 0,
+          ...(reasoning === undefined ? {} : { reasoning }),
+          totalTokens: totalTokens ?? (inputTokens ?? 0) + (outputTokens ?? 0),
+          cost: {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+            total: 0,
+          },
+        };
   return {
     tokens: numberValue(last?.totalTokens),
     contextWindow: numberValue(usage?.modelContextWindow),
+    modelUsage,
   };
 }
 
@@ -706,12 +736,24 @@ const makeCodexSession = (
           break;
         }
         case "thread/tokenUsage/updated": {
-          const { tokens, contextWindow } = parseThreadTokenUsage(params);
+          const { tokens, contextWindow, modelUsage } =
+            parseThreadTokenUsage(params);
+          if (modelUsage) {
+            const model = task.parent.modelRegistry
+              ?.getAll()
+              .find((candidate) => candidate.id === state.meta.modelLabel);
+            if (model) modelUsage.cost = calculateCost(model, modelUsage);
+          }
           if (contextWindow !== undefined) {
             state.meta = { ...state.meta, contextWindow };
             emit({ _tag: "MetaChanged", meta: { contextWindow } });
           }
-          emit({ _tag: "UsageChanged", tokens, contextWindow });
+          emit({
+            _tag: "UsageChanged",
+            tokens,
+            contextWindow,
+            modelUsage,
+          });
           break;
         }
         case "error": {

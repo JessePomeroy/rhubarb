@@ -69,6 +69,12 @@ import {
   SUBAGENT_WAIT_TOOL_DESCRIPTION,
 } from "./src/prompt.ts";
 import { createDeferredResultDelivery } from "./src/result-delivery.ts";
+import { emptyModelUsage, hasModelUsage } from "../shared/model-usage.ts";
+import {
+  appendChildUsage,
+  childUsageKey,
+  claimChildUsage,
+} from "../shared/usage-ledger.ts";
 import {
   createSubagentRuntime,
   runTool,
@@ -224,6 +230,17 @@ export default function (pi: ExtensionAPI) {
     // A shutdown can settle children while disposing their scopes. Never
     // append into a session whose extension runtime is already closing.
     if (!sessionContext) return;
+    appendChildUsage(pi, {
+      key: childUsageKey("subagent", snap.id, snap.runNumber),
+      kind: "subagent",
+      sourceId: snap.id,
+      run: snap.runNumber,
+      status: snap.status,
+      model: snap.meta.modelLabel,
+      backend: snap.backend,
+      usage: snap.lastRunUsage ?? emptyModelUsage(),
+      reportedToParent: false,
+    });
     if (snap.origin === "btw") {
       deliverBtwResult({ ...snap, meta: { ...snap.meta } });
       return;
@@ -364,7 +381,7 @@ export default function (pi: ExtensionAPI) {
         description: SUBAGENT_WAIT_PARAMETER_DESCRIPTIONS.ids,
       }),
     }),
-    async execute(_toolCallId, params, signal, onUpdate) {
+    async execute(_toolCallId, params, signal, onUpdate, ctx) {
       const manager = await getManager();
       const ids = [...new Set(params.ids)];
       if (ids.length === 0)
@@ -436,6 +453,16 @@ export default function (pi: ExtensionAPI) {
       const text = bounded.truncated
         ? `${bounded.content}\n\n[wait output truncated at the total output limit]`
         : bounded.content;
+      const usage = claimChildUsage(
+        pi,
+        ctx.sessionManager.getBranch(),
+        ids.flatMap((id) => {
+          const snap = manager.view.get(id);
+          return snap
+            ? [childUsageKey("subagent", snap.id, snap.runNumber)]
+            : [];
+        }),
+      );
       return {
         content: [{ type: "text", text }],
         details: {
@@ -444,6 +471,7 @@ export default function (pi: ExtensionAPI) {
             return { id, title: snap?.title, status: snap?.status };
           }),
         },
+        ...(hasModelUsage(usage) ? { usage } : {}),
       };
     },
   });
@@ -457,7 +485,7 @@ export default function (pi: ExtensionAPI) {
         description: SUBAGENT_CANCEL_PARAMETER_DESCRIPTIONS.ids,
       }),
     }),
-    async execute(_toolCallId, params) {
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const manager = await getManager();
       const ids = [...new Set(params.ids)];
       if (ids.length === 0)
@@ -484,6 +512,16 @@ export default function (pi: ExtensionAPI) {
           ? `Cancelled ${entry.id} "${entry.title}".`
           : `${entry.id} "${entry.title}" was already ${entry.status}.`,
       );
+      const usage = claimChildUsage(
+        pi,
+        ctx.sessionManager.getBranch(),
+        ids.flatMap((id) => {
+          const snap = manager.view.get(id);
+          return snap
+            ? [childUsageKey("subagent", snap.id, snap.runNumber)]
+            : [];
+        }),
+      );
 
       return {
         content: [{ type: "text", text: lines.join("\n") }],
@@ -494,6 +532,7 @@ export default function (pi: ExtensionAPI) {
             status: entry.status,
           })),
         },
+        ...(hasModelUsage(usage) ? { usage } : {}),
       };
     },
   });

@@ -96,6 +96,9 @@ test("stub subagent completes and delivers a final result", async () => {
       /\[stub:claude\] completed: Say hello to the tests/,
     );
     assert.ok(done.turns >= 2);
+    assert.equal(done.runNumber, 1);
+    assert.equal(done.lastRunUsage?.totalTokens, 1_700);
+    assert.equal(done.lastRunUsage?.reasoning, 100);
     assert.ok(done.transcript.some((item) => item.kind === "toolResult"));
     // The waitFor marked the settle as consumed.
     assert.deepEqual(settled, [{ id: snap.id, consumed: true }]);
@@ -271,6 +274,8 @@ test("send steers an idle subagent into another turn", async () => {
     await runTool(runtime, manager.waitFor([snap.id]));
     const afterSecond = manager.view.get(snap.id);
     assert.equal(afterSecond?.status, "done");
+    assert.equal(afterSecond?.runNumber, 2);
+    assert.equal(afterSecond?.lastRunUsage?.totalTokens, 1_700);
     assert.match(afterSecond?.finalText ?? "", /Second turn/);
   });
 });

@@ -4,6 +4,7 @@
  */
 
 import * as os from "node:os";
+import type { Usage } from "@earendil-works/pi-ai";
 import {
   truncateHead,
   type ExtensionContext,
@@ -21,7 +22,11 @@ export interface AgentUsage {
   output: number;
   cacheRead: number;
   cacheWrite: number;
+  /** Reasoning is a subset of output, not an additional token category. */
+  reasoning: number;
+  totalTokens: number;
   cost: number;
+  costDetails: Usage["cost"];
   /** Latest compaction-aware conversation occupancy, not cumulative billing. */
   contextTokens?: number;
   turns: number;
@@ -33,7 +38,16 @@ export function emptyUsage(): AgentUsage {
     output: 0,
     cacheRead: 0,
     cacheWrite: 0,
+    reasoning: 0,
+    totalTokens: 0,
     cost: 0,
+    costDetails: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      total: 0,
+    },
     turns: 0,
   };
 }
@@ -173,10 +187,29 @@ export function aggregateUsage(agents: AgentRecord[]): AgentUsage {
     total.output += agent.usage.output;
     total.cacheRead += agent.usage.cacheRead;
     total.cacheWrite += agent.usage.cacheWrite;
+    total.reasoning += agent.usage.reasoning;
+    total.totalTokens += agent.usage.totalTokens;
     total.cost += agent.usage.cost;
+    total.costDetails.input += agent.usage.costDetails.input;
+    total.costDetails.output += agent.usage.costDetails.output;
+    total.costDetails.cacheRead += agent.usage.costDetails.cacheRead;
+    total.costDetails.cacheWrite += agent.usage.costDetails.cacheWrite;
+    total.costDetails.total += agent.usage.costDetails.total;
     total.turns += agent.usage.turns;
   }
   return total;
+}
+
+export function workflowUsageToModelUsage(usage: AgentUsage): Usage {
+  return {
+    input: usage.input,
+    output: usage.output,
+    cacheRead: usage.cacheRead,
+    cacheWrite: usage.cacheWrite,
+    reasoning: usage.reasoning,
+    totalTokens: usage.totalTokens,
+    cost: { ...usage.costDetails, total: usage.cost },
+  };
 }
 
 export function countStates(details: WorkflowDetails) {

@@ -98,39 +98,43 @@ The custom header displays lowercase old-school ASCII `rhubarb` art. The footer 
 - context percentage/window;
 - session cost and recent output speed;
 - Git branch, changed files, and PR number;
-- extension status rows for active agents, workflows, and terminals.
+- extension status rows for active agents, workflows, terminals, and recorded child usage.
 
 Git information refreshes after shell or file mutations rather than constant polling.
 
 ## Commands
 
-| Command      | Purpose                                               |
-| ------------ | ----------------------------------------------------- |
-| `/subagents` | Inspect, steer, and cancel subagents                  |
-| `/btw`       | Start a side-question agent                           |
-| `/workflows` | Inspect workflow runs and artifacts                   |
-| `/ps`        | Manage background terminals                           |
-| `/lg`        | Browse changed files and diffs                        |
-| `/pr`        | Show the current branch's pull request                |
-| `/copy-all`  | Copy user and assistant messages on the active branch |
-| `/reload`    | Reload rhubarb resources                              |
+| Command      | Purpose                                                        |
+| ------------ | -------------------------------------------------------------- |
+| `/subagents` | Inspect, steer, and cancel subagents                           |
+| `/btw`       | Start a side-question agent                                    |
+| `/workflows` | Inspect workflow runs and artifacts                            |
+| `/usage`     | Show parent and child token, cache, reasoning, and cost totals |
+| `/ps`        | Manage background terminals                                    |
+| `/lg`        | Browse changed files and diffs                                 |
+| `/pr`        | Show the current branch's pull request                         |
+| `/copy-all`  | Copy user and assistant messages on the active branch          |
+| `/reload`    | Reload rhubarb resources                                       |
 
 ## State and lifecycle
 
-| Data                    | Location               | Lifetime              |
-| ----------------------- | ---------------------- | --------------------- |
-| Preferences             | `settings.json`        | Tracked               |
-| Global instructions     | `AGENTS.md`            | Tracked               |
-| Firecrawl key           | `.env`                 | Private, persistent   |
-| Provider authentication | `auth.json`            | Private, persistent   |
-| Pi sessions             | `sessions/`            | Private, persistent   |
-| Workflow artifacts      | `workflows/<run-id>/`  | Private, persistent   |
-| Downloaded `fd`/`rg`    | `bin/`                 | Generated, persistent |
-| Background output       | OS temporary directory | Current pi session    |
-| Large search/web output | OS temporary directory | Until OS cleanup      |
-| Dependencies            | `node_modules/`        | Generated             |
+| Data                    | Location               | Lifetime                |
+| ----------------------- | ---------------------- | ----------------------- |
+| Preferences             | `settings.json`        | Tracked                 |
+| Global instructions     | `AGENTS.md`            | Tracked                 |
+| Firecrawl key           | `.env`                 | Private, persistent     |
+| Provider authentication | `auth.json`            | Private, persistent     |
+| Pi sessions             | `sessions/`            | Private, persistent     |
+| Workflow artifacts      | `workflows/<run-id>/`  | Private, persistent     |
+| Child usage ledger      | Pi session JSONL       | Private, session-scoped |
+| Downloaded `fd`/`rg`    | `bin/`                 | Generated, persistent   |
+| Background output       | OS temporary directory | Current pi session      |
+| Large search/web output | OS temporary directory | Until OS cleanup        |
+| Dependencies            | `node_modules/`        | Generated               |
 
 Session shutdown cancels subagents, workflows, and terminal process groups. Workflow artifacts already written remain available. Background-terminal temporary output is removed.
+
+Pi-backed children aggregate assistant and nested-tool `Usage`; Codex children map `thread/tokenUsage/updated` counters into the same shape. Blocking waits and workflows attach previously unreported child usage to their tool result so pi's built-in `/session` totals include it. Asynchronous completions remain in a revisioned session ledger, and `/usage` combines that ledger with parent usage without counting reported children twice. Reasoning is shown as a subset of output. Provider account limits are separate from these local totals, and runs completed before tracking was installed cannot be reconstructed exactly.
 
 ## How the systems cooperate
 

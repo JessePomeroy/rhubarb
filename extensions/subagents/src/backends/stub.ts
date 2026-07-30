@@ -113,6 +113,21 @@ const makeStubSession = (
       }).pipe(Effect.asVoid);
 
     const pause = Effect.sleep(Duration.millis(profile.cadenceMs));
+    const modelUsage = (turn: number, output: number) => ({
+      input: 1_000 * (turn + 1),
+      output,
+      cacheRead: 400 * (turn + 1),
+      cacheWrite: 0,
+      reasoning: 100 * (turn + 1),
+      totalTokens: 1_400 * (turn + 1) + output,
+      cost: {
+        input: 0.001 * (turn + 1),
+        output: output * 0.000002,
+        cacheRead: 0.0001 * (turn + 1),
+        cacheWrite: 0,
+        total: 0.0011 * (turn + 1) + output * 0.000002,
+      },
+    });
 
     const runTurn = (userText: string, turn: number) =>
       Effect.gen(function* () {
@@ -162,6 +177,7 @@ const makeStubSession = (
           _tag: "UsageChanged",
           tokens: Math.min(profile.contextWindow, 2400 * (turn + 1)),
           contextWindow: profile.contextWindow,
+          modelUsage: modelUsage(turn, 0),
         });
 
         if (failing) {
@@ -192,6 +208,7 @@ const makeStubSession = (
           _tag: "UsageChanged",
           tokens: Math.min(profile.contextWindow, 2400 * (turn + 1) + 900),
           contextWindow: profile.contextWindow,
+          modelUsage: modelUsage(turn, 300 * (turn + 1)),
         });
         yield* emit({
           _tag: "RunSettled",

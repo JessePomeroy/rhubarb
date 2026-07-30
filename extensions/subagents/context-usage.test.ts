@@ -70,7 +70,7 @@ const codexParams = (tokenUsage: unknown) => ({
 });
 
 test("Codex occupancy uses tokenUsage.last.totalTokens, not the cumulative total", () => {
-  const { tokens, contextWindow } = parseThreadTokenUsage(
+  const { tokens, contextWindow, modelUsage } = parseThreadTokenUsage(
     codexParams({
       total: {
         totalTokens: 1_450_000,
@@ -91,6 +91,21 @@ test("Codex occupancy uses tokenUsage.last.totalTokens, not the cumulative total
   );
   assert.equal(tokens, 61_000);
   assert.equal(contextWindow, 272_000);
+  assert.deepEqual(modelUsage, {
+    input: 100_000,
+    output: 50_000,
+    cacheRead: 1_300_000,
+    cacheWrite: 0,
+    reasoning: 20_000,
+    totalTokens: 1_450_000,
+    cost: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      total: 0,
+    },
+  });
 });
 
 test("Codex occupancy is unknown when last usage or window is absent", () => {
@@ -98,10 +113,28 @@ test("Codex occupancy is unknown when last usage or window is absent", () => {
     parseThreadTokenUsage(
       codexParams({ total: { totalTokens: 10 }, modelContextWindow: null }),
     ),
-    { tokens: undefined, contextWindow: undefined },
+    {
+      tokens: undefined,
+      contextWindow: undefined,
+      modelUsage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 10,
+        cost: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          total: 0,
+        },
+      },
+    },
   );
   assert.deepEqual(parseThreadTokenUsage({ threadId: "t" }), {
     tokens: undefined,
     contextWindow: undefined,
+    modelUsage: undefined,
   });
 });

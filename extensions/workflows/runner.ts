@@ -32,6 +32,7 @@ import {
   shutdownAndDisposeChildSession,
 } from "../shared/child-session.ts";
 import { createToolCallTimeoutGuard } from "../shared/tool-call-timeout.ts";
+import { usageFromMessages } from "../shared/model-usage.ts";
 import { emptyUsage, type AgentUsage, type TranscriptEntry } from "./model.ts";
 import {
   buildWorkflowAgentPrompt,
@@ -361,20 +362,19 @@ export function transcriptFromMessages(
   return bounded;
 }
 
-function computeUsage(messages: AgentMessage[]): AgentUsage {
-  const usage = emptyUsage();
-  for (const msg of messages) {
-    if (msg.role !== "assistant") continue;
-    usage.turns++;
-    const u = msg.usage;
-    if (!u) continue;
-    usage.input += u.input || 0;
-    usage.output += u.output || 0;
-    usage.cacheRead += u.cacheRead || 0;
-    usage.cacheWrite += u.cacheWrite || 0;
-    usage.cost += u.cost?.total || 0;
-  }
-  return usage;
+export function computeUsage(messages: AgentMessage[]): AgentUsage {
+  const modelUsage = usageFromMessages(messages);
+  return {
+    input: modelUsage.input,
+    output: modelUsage.output,
+    cacheRead: modelUsage.cacheRead,
+    cacheWrite: modelUsage.cacheWrite,
+    reasoning: modelUsage.reasoning ?? 0,
+    totalTokens: modelUsage.totalTokens,
+    cost: modelUsage.cost.total,
+    costDetails: { ...modelUsage.cost },
+    turns: messages.filter((message) => message.role === "assistant").length,
+  };
 }
 
 function errorText(error: unknown): string {
