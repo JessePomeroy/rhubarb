@@ -33,6 +33,7 @@ This project is being built intentionally from pi's public extension APIs and do
 ## Documentation
 
 - [Installation and recovery](SETUP.md)
+- [Move instructions and skills into shared global configuration](GLOBAL-CONFIG.md)
 - [Architecture and usage](ARCHITECTURE.md)
 - [Local web services: startup, configuration, verification](services/local-web/README.md)
 

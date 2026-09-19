@@ -48,6 +48,10 @@ Firecrawl is disabled unless explicitly enabled.
 
 ## Shared skills and personal settings
 
+To use these files across multiple agents, follow the
+[shared global configuration guide](GLOBAL-CONFIG.md). It covers copying complete
+skill packages, merging existing instructions, symlink discovery, and safe updates.
+
 This repository contains regular-file snapshots of the author's shared skills and
 AGENTS.md, so a clone does not depend on personal symlink targets. The author's
 active installation keeps those symlinks; Git may therefore show local type changes
