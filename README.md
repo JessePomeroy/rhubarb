@@ -10,7 +10,7 @@ A personal, public [pi](https://pi.dev) configuration focused on:
 - fast file and content search
 - a useful, compact terminal interface
 
-This project is being built intentionally from pi's public extension APIs and documentation. Mostly Ben Davis' workflow.
+This project is being built intentionally from pi's public extension APIs and documentation.
 
 ## Included
 
