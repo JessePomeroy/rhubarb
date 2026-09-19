@@ -232,10 +232,12 @@ async function runFirecrawl<T>(
 }
 
 export default function firecrawlTools(pi: ExtensionAPI) {
+  // Preserve credentials and implementation, but never silently use paid APIs.
+  if (process.env.PI_ENABLE_FIRECRAWL !== "1") return;
   pi.registerTool({
-    name: "search",
+    name: "firecrawl_search",
     label: "Search Web",
-    description: SEARCH_TOOL_DESCRIPTION,
+    description: `Optional paid fallback. Use only when explicitly requested by the user. ${SEARCH_TOOL_DESCRIPTION}`,
     promptSnippet: SEARCH_PROMPT_SNIPPET,
     promptGuidelines: SEARCH_PROMPT_GUIDELINES,
     parameters: Type.Object({
@@ -278,9 +280,9 @@ export default function firecrawlTools(pi: ExtensionAPI) {
   });
 
   pi.registerTool({
-    name: "crawl",
+    name: "firecrawl_crawl",
     label: "Crawl Website",
-    description: CRAWL_TOOL_DESCRIPTION,
+    description: `Optional paid fallback. Use only when explicitly requested by the user. ${CRAWL_TOOL_DESCRIPTION}`,
     promptSnippet: CRAWL_PROMPT_SNIPPET,
     promptGuidelines: CRAWL_PROMPT_GUIDELINES,
     parameters: Type.Object({
@@ -359,9 +361,9 @@ export default function firecrawlTools(pi: ExtensionAPI) {
   });
 
   pi.registerTool({
-    name: "scrape",
+    name: "firecrawl_scrape",
     label: "Scrape Page",
-    description: SCRAPE_TOOL_DESCRIPTION,
+    description: `Optional paid fallback. Use only when explicitly requested by the user. ${SCRAPE_TOOL_DESCRIPTION}`,
     promptSnippet: SCRAPE_PROMPT_SNIPPET,
     promptGuidelines: SCRAPE_PROMPT_GUIDELINES,
     parameters: Type.Object({

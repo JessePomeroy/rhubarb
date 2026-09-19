@@ -20,15 +20,20 @@ Extensions execute with the current user's OS permissions. Rhubarb adds lifecycl
 
 ### Normal coding
 
-Use the parent pi session for focused work. It has the normal coding tools plus `fd`, `rg`, Firecrawl, structured questions, terminals, subagents, and workflows.
+Use the parent pi session for focused work. It has the normal coding tools plus `fd`, `rg`, local web tools, structured questions, terminals, subagents, and workflows.
 
 ### Web research
 
-1. `firecrawl_search` finds current web or news results.
-2. `firecrawl_scrape` reads a selected page.
-3. `firecrawl_crawl` collects a bounded site section only when multiple pages are needed.
+1. `search` uses local SearXNG for discovery.
+2. `scrape` uses local Crawl4AI to extract one page as Markdown.
+3. `crawl` follows same-origin links with explicit page and depth budgets, using Crawl4AI for each page.
+4. `browser_tools` discovers Playwright MCP tools and their schemas; `browser_call` invokes them when interaction or browser inspection is necessary.
 
-Crawls default to 10 pages and cannot exceed 100. Oversized model output spills to private temporary files.
+Local service endpoints are restricted to loopback. SearXNG and Crawl4AI run in Docker; Playwright MCP runs as a host user service so it can reach localhost development apps. No LLM extraction strategy or paid API is used. Browser sessions are isolated per MCP connection and closed on Pi session shutdown. Oversized text spills to private temporary files using Pi's existing output limits.
+
+Firecrawl is disabled by default. `PI_ENABLE_FIRECRAWL=1` registers separate `firecrawl_search`, `firecrawl_scrape`, and `firecrawl_crawl` tools; use them only on explicit user request. No automatic paid fallback occurs. Credentials remain in their existing location.
+
+See [local web setup](services/local-web/README.md) for service startup, configuration and real integration checks.
 
 ### Independent delegation
 
@@ -36,11 +41,15 @@ Use `subagent_spawn` for ordinary independent work.
 
 - `pi` children run in-process with the pi SDK and inherit the parent model and thinking level unless overridden.
 - `codex` children use Codex app-server.
-- Children have normal coding access but cannot recursively spawn agents, run workflows, or ask interactive questions.
+- Pi children have normal coding access but cannot recursively spawn agents, run workflows, or ask the human. Their `ask_parent` tool waits for a correlated parent reply.
 - Four children may run concurrently; 64 records remain available in session memory.
 - Completion is delivered automatically unless `subagent_wait` is already consuming it.
 
 Use `/subagents` to inspect, steer, or cancel active runs. `/btw` starts a side-question pi child.
+
+`subagent_message` exposes parent-to-child steering/continuation across backends. For a Pi child's pending question, pass its exact `reply_to` id. `subagent_wait` returns early for a question, even if other children are still running, so waiting does not deadlock the parent. Cancellation and shutdown release blocked questions. `/btw` sessions remain private and do not receive `ask_parent`.
+
+Inside an interactive Herdr parent pane, each model-spawned child opens a sibling viewer by default. A private per-child Unix socket streams the existing transcript and accepts input; it does not resume the same session in a second agent process. Viewers support all three backends, preserve parent focus and cwd, and show pending questions. `/subagent-panes off` disables automatic panes until reload; `/subagent-pane <id>` opens/reopens a tracked child. Ctrl+D detaches; Ctrl+X cancels the child. Closing/reloading the parent disconnects viewers. Empty panes are left for the user to close. See [subagent communication and panes](extensions/subagents/README.md).
 
 ### Ultracode workflows
 

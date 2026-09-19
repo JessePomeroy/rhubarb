@@ -7,6 +7,8 @@ description: invoke this skill when the user asks you to use subagents
 
 Each subagent is headless, has its own context window, cannot see the parent conversation, cannot ask the user, and cannot spawn subagents or workflows. Give every child a self-contained prompt with paths, constraints, and the expected report.
 
+Pi children can use `ask_parent` for a necessary clarification. Answer their question with `subagent_message({ id, message, reply_to })`, using the exact question id supplied. Parent replies must stay within the user's existing authorization. Other harnesses can receive messages but do not have this structured child-question tool.
+
 ## Pi Harness
 
 **Harness:** `pi`
@@ -62,8 +64,12 @@ Call `subagent_spawn` with a complete `prompt`, short `name`, chosen `harness`, 
 
 - `subagent_check({ id })`: peek without blocking.
 - `subagent_list()`: list all runs.
-- `subagent_wait({ ids })`: block only when results are required to proceed.
+- `subagent_message({ id, message, reply_to? })`: steer/continue a child, or answer its pending question using `reply_to`.
+- `subagent_wait({ ids })`: wait for completion or a question needing your reply. Answer pending questions before waiting again.
 - `subagent_cancel({ ids })`: stop runs while preserving partial transcripts.
 - `/subagents`: inspect or take over a run interactively.
+- Inside Herdr, interactive parent sessions open child viewers in sibling panes by default. `/subagent-panes off` disables automatic panes for this extension session; `/subagent-pane sa-1` opens an existing child.
+
+The pane shows the same managed child, not a second agent process. Type to steer or answer its displayed question; Ctrl+X cancels the child, and Ctrl+D detaches the viewer without cancelling work. Nested delegation remains disabled for Pi children.
 
 Results return automatically. After spawning, continue useful parent work instead of immediately waiting.

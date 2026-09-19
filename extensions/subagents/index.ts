@@ -56,6 +56,7 @@ import { SubagentManager, type SubagentManagerShape } from "./src/manager.ts";
 import {
   buildSubagentResultMessage,
   buildSubagentSpawnResult,
+  buildParentQuestionMessage,
   SUBAGENT_CANCEL_PARAMETER_DESCRIPTIONS,
   SUBAGENT_CANCEL_TOOL_DESCRIPTION,
   SUBAGENT_CHECK_PARAMETER_DESCRIPTIONS,
@@ -81,6 +82,7 @@ import {
   type SubagentRuntime,
 } from "./src/runtime.ts";
 import { openSubagentPicker, openSubagentTakeover } from "./src/ui/takeover.ts";
+import { createHerdrPanes, inHerdr } from "./src/herdr-panes.ts";
 
 const SUBAGENT_OUTPUT_MAX_BYTES = 24 * 1024;
 const WAIT_OUTPUT_MAX_BYTES = 48 * 1024;
@@ -103,7 +105,7 @@ function describeSubagent(snap: SubagentSnapshot) {
     formatElapsed(snap),
     snap.cwd,
   ].filter(Boolean);
-  return `${snap.id} [${snap.status}] "${snap.title}" (${details.join(", ")})`;
+  return `${snap.id} [${snap.pendingQuestion ? "waiting for parent" : snap.status}] "${snap.title}" (${details.join(", ")})`;
 }
 
 function truncatedOutput(
@@ -149,9 +151,26 @@ export default function (pi: ExtensionAPI) {
   let sessionContext: ExtensionContext | undefined;
   let ui: ExtensionUIContext | undefined;
   let unsubStatus: (() => void) | undefined;
+  let panes: ReturnType<typeof createHerdrPanes> | undefined;
+  let autoPanes = inHerdr();
   const resultDelivery = createDeferredResultDelivery<SubagentSnapshot>();
 
   const getRuntime = () => (runtime ??= createSubagentRuntime());
+  const getPanes = (
+    manager: SubagentManagerShape,
+    context: ExtensionContext,
+  ) => {
+    if (!context.hasUI || !inHerdr())
+      throw new Error(
+        "Open child panes from an interactive Pi session inside Herdr.",
+      );
+    return (panes ??= createHerdrPanes({
+      view: manager.view,
+      theme: context.ui.theme,
+      send: (id, text, replyTo) =>
+        runTool(getRuntime(), manager.send(id, text, replyTo)),
+    }));
+  };
 
   /** Resolve the manager service once per runtime and wire the extension hooks. */
   const getManager = () => {
@@ -159,6 +178,18 @@ export default function (pi: ExtensionAPI) {
       .runPromise(SubagentManager)
       .then((manager) => {
         manager.view.setOnSettled(onSettled);
+        manager.view.setOnQuestion((snap, consumed) => {
+          if (!sessionContext || consumed || !isModelVisible(snap)) return;
+          pi.sendMessage(
+            {
+              customType: "subagent-question",
+              content: buildParentQuestionMessage(snap),
+              display: true,
+              details: { id: snap.id, question: snap.pendingQuestion },
+            },
+            { deliverAs: "steer", triggerTurn: true },
+          );
+        });
         unsubStatus?.();
         unsubStatus = manager.view.subscribe(() => updateStatus(manager));
         updateStatus(manager);
@@ -271,6 +302,8 @@ export default function (pi: ExtensionAPI) {
     unsubStatus = undefined;
     ui?.setStatus("subagents", undefined);
     ui = undefined;
+    await panes?.close();
+    panes = undefined;
     const closing = runtime;
     runtime = undefined;
     managerPromise = undefined;
@@ -280,6 +313,43 @@ export default function (pi: ExtensionAPI) {
   });
 
   // --- Tools -------------------------------------------------------------
+
+  pi.registerTool({
+    name: "subagent_message",
+    label: "Message Subagent",
+    description:
+      "Send a message to a tracked subagent. Steers a running child when supported by its harness or continues a settled child. To answer a Pi child's pending question, include its exact reply_to question id. Without reply_to, a child awaiting an answer rejects steering. Cannot address private /btw sessions.",
+    parameters: Type.Object({
+      id: Type.String(),
+      message: Type.String({ minLength: 1 }),
+      reply_to: Type.Optional(
+        Type.String({
+          description:
+            "Pending question id from the child's notification or subagent_check/wait.",
+        }),
+      ),
+    }),
+    async execute(_id, params, signal) {
+      const manager = await getManager();
+      const snap = manager.view.get(params.id);
+      if (!snap || !isModelVisible(snap))
+        throw new Error(`Unknown subagent id "${params.id}".`);
+      await runTool(
+        getRuntime(),
+        manager.send(params.id, params.message, params.reply_to),
+        { signal },
+      );
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Message delivered to ${params.id}${params.reply_to ? ` as reply to ${params.reply_to}` : ""}.`,
+          },
+        ],
+        details: { id: params.id },
+      };
+    },
+  });
 
   pi.registerTool({
     name: "subagent_spawn",
@@ -346,6 +416,17 @@ export default function (pi: ExtensionAPI) {
           },
         }),
       );
+
+      if (autoPanes && ctx.hasUI && inHerdr()) {
+        try {
+          await getPanes(manager, ctx).open(snap.id);
+        } catch (error) {
+          ctx.ui.notify(
+            `Child ${snap.id} is running; pane unavailable: ${error instanceof Error ? error.message : String(error)}. Use /subagents.`,
+            "warning",
+          );
+        }
+      }
 
       return {
         content: [
@@ -425,15 +506,26 @@ export default function (pi: ExtensionAPI) {
           sections.push(`## ${id}\n\n(no longer tracked)`);
           continue;
         }
-        const verb = snap.status === "error" ? "failed" : "finished";
+        const verb =
+          snap.status === "running"
+            ? "still running"
+            : snap.status === "error"
+              ? "failed"
+              : "finished";
         let section = `## ${snap.id} "${snap.title}" ${verb}`;
+        if (snap.pendingQuestion) {
+          section += `\n\n${buildParentQuestionMessage(snap)}`;
+          sections.push(section);
+          remainingBytes -= Buffer.byteLength(section, "utf8");
+          continue;
+        }
         if (snap.errorText) section += `\nError: ${snap.errorText}`;
         const headerBytes = Buffer.byteLength(section, "utf8") + 2;
         const outputBudget = Math.max(
           512,
           Math.min(WAIT_PER_AGENT_MAX_BYTES, remainingBytes - headerBytes),
         );
-        section += `\n\n${truncatedOutput(snap, outputBudget)}`;
+        section += `\n\n${snap.status === "running" ? "Result not available yet." : truncatedOutput(snap, outputBudget)}`;
         const sectionBytes = Buffer.byteLength(section, "utf8");
         if (sectionBytes > remainingBytes) {
           sections.push(
@@ -468,7 +560,12 @@ export default function (pi: ExtensionAPI) {
         details: {
           results: ids.map((id) => {
             const snap = manager.view.get(id);
-            return { id, title: snap?.title, status: snap?.status };
+            return {
+              id,
+              title: snap?.title,
+              status: snap?.status,
+              pendingQuestion: snap?.pendingQuestion,
+            };
           }),
         },
         ...(hasModelUsage(usage) ? { usage } : {}),
@@ -560,6 +657,8 @@ export default function (pi: ExtensionAPI) {
       }
 
       let text = `${describeSubagent(snap)}\nTurns: ${snap.turns}`;
+      if (snap.pendingQuestion)
+        text += `\n\n${buildParentQuestionMessage(snap)}`;
       if (snap.errorText) text += `\nError: ${snap.errorText}`;
 
       const output = latestText(snap);
@@ -573,7 +672,12 @@ export default function (pi: ExtensionAPI) {
 
       return {
         content: [{ type: "text", text }],
-        details: { id: snap.id, status: snap.status, turns: snap.turns },
+        details: {
+          id: snap.id,
+          status: snap.status,
+          turns: snap.turns,
+          pendingQuestion: snap.pendingQuestion,
+        },
       };
     },
   });
@@ -598,6 +702,7 @@ export default function (pi: ExtensionAPI) {
             title: snap.title,
             harness: snap.backend,
             status: snap.status,
+            pendingQuestion: snap.pendingQuestion,
           })),
         },
       };
@@ -776,6 +881,37 @@ export default function (pi: ExtensionAPI) {
         return;
       }
       await openSubagentPicker(ctx, manager.view);
+    },
+  });
+
+  pi.registerCommand("subagent-panes", {
+    description:
+      "Toggle automatic Herdr child panes: on, off, or status (default on inside Herdr)",
+    handler: async (args, ctx) => {
+      if (args.trim() === "on") {
+        if (!ctx.hasUI || !inHerdr())
+          throw new Error("Pi must be running inside Herdr.");
+        autoPanes = true;
+      } else if (args.trim() === "off") autoPanes = false;
+      else if (args.trim() && args.trim() !== "status")
+        throw new Error("Use /subagent-panes on, off, or status.");
+      ctx.ui.notify(
+        `Automatic Herdr child panes: ${autoPanes ? "on" : "off"}. Existing panes are unchanged.`,
+        "info",
+      );
+    },
+  });
+  pi.registerCommand("subagent-pane", {
+    description:
+      "Open an existing child in a separate Herdr pane: /subagent-pane sa-1",
+    handler: async (args, ctx) => {
+      const manager = await getManager();
+      const id = args.trim();
+      if (!manager.view.get(id))
+        throw new Error(
+          "Specify a tracked child id, e.g. /subagent-pane sa-1.",
+        );
+      await getPanes(manager, ctx).open(id);
     },
   });
 }

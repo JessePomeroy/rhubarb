@@ -1,0 +1,15 @@
+{
+  "name": "rhubarb-local-web-services",
+  "version": "1.0.0",
+  "description": "Pinned host Playwright MCP runtime for Pi",
+  "scripts": {
+    "browser:install": "playwright install chromium",
+    "verify": "node verify.mjs"
+  },
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@playwright/mcp": "0.0.82"
+  },
+  "private": true
+}

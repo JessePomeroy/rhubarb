@@ -37,6 +37,7 @@ function statusGlyph(snap: SubagentSnapshot, theme: Theme): string {
 }
 
 function statusWord(snap: SubagentSnapshot, theme: Theme): string {
+  if (snap.pendingQuestion) return theme.fg("warning", "waiting for parent");
   switch (snap.status) {
     case "running":
       return theme.fg("warning", "running");
@@ -516,7 +517,10 @@ class TakeoverView implements Component, Focusable {
     const header =
       `${statusGlyph(snap, theme)} ` +
       theme.fg("accent", theme.bold(`${snap.id} · ${snap.title}`)) +
-      theme.fg("muted", ` · ${snap.status} · ${formatElapsed(snap)}`) +
+      theme.fg(
+        "muted",
+        ` · ${snap.pendingQuestion ? "waiting for parent" : snap.status} · ${formatElapsed(snap)}`,
+      ) +
       (this.options?.badge
         ? theme.fg("muted", ` · ${this.options.badge}`)
         : "") +

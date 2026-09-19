@@ -35,6 +35,7 @@ import type {
   SubagentSnapshot,
   SubagentStatus,
   TranscriptItem,
+  ParentQuestion,
 } from "./domain.ts";
 import {
   BackendUnavailableError,
@@ -64,6 +65,7 @@ interface MutableSnapshot {
   prompt: string;
   cwd: string;
   status: SubagentStatus;
+  pendingQuestion?: ParentQuestion;
   createdAt: number;
   settledAt?: number;
   errorText?: string;
@@ -115,6 +117,9 @@ export interface SubagentReadModel {
   setOnSettled(
     hook: ((snap: SubagentSnapshot, consumed: boolean) => void) | undefined,
   ): void;
+  setOnQuestion(
+    hook: ((snap: SubagentSnapshot, consumed: boolean) => void) | undefined,
+  ): void;
 }
 
 // --- Service --------------------------------------------------------------------
@@ -148,7 +153,11 @@ export interface SubagentManagerShape {
   cancel(
     ids: ReadonlyArray<string>,
   ): Effect.Effect<ReadonlyArray<CancelResult>>;
-  send(id: string, text: string): Effect.Effect<void, SendError>;
+  send(
+    id: string,
+    text: string,
+    replyTo?: string,
+  ): Effect.Effect<void, SendError>;
   get(id: string): Effect.Effect<SubagentSnapshot | undefined>;
   readonly list: Effect.Effect<ReadonlyArray<SubagentSnapshot>>;
   readonly disposeAll: Effect.Effect<void>;
@@ -181,6 +190,8 @@ const makeManager = Effect.gen(function* () {
   let reserved = 0;
   let disposed = false;
   let onSettled:
+    ((snap: SubagentSnapshot, consumed: boolean) => void) | undefined;
+  let onQuestion:
     ((snap: SubagentSnapshot, consumed: boolean) => void) | undefined;
 
   const notify = (id?: string) => {
@@ -286,6 +297,7 @@ const makeManager = Effect.gen(function* () {
     entry.liveToolMap.clear();
     s.liveTools = [];
     s.queued = [];
+    s.pendingQuestion = undefined;
     const consumed = (waitInterest.get(s.id) ?? 0) > 0;
     notify(s.id);
     try {
@@ -300,6 +312,19 @@ const makeManager = Effect.gen(function* () {
   const foldEvent = (entry: Entry, event: SubagentEvent) => {
     const s = entry.snapshot;
     switch (event._tag) {
+      case "ParentQuestionChanged": {
+        s.pendingQuestion = event.question;
+        const consumed = (waitInterest.get(s.id) ?? 0) > 0;
+        notify(s.id);
+        if (event.question && !disposed) {
+          try {
+            onQuestion?.(s, consumed);
+          } catch {
+            /* Question remains visible to check/wait/UI. */
+          }
+        }
+        return;
+      }
       case "RunStarted":
         entry.restarting = false;
         if (s.status !== "running") {
@@ -497,6 +522,10 @@ const makeManager = Effect.gen(function* () {
       addInterest(unique);
       const loop = Effect.gen(function* () {
         while (true) {
+          // A parent waiting for completion must regain control to answer a
+          // blocked child, even if other requested children are still running.
+          if (unique.some((id) => entries.get(id)?.snapshot.pendingQuestion))
+            return;
           const pending = unique.filter(
             (id) => entries.get(id)?.snapshot.status === "running",
           );
@@ -583,12 +612,19 @@ const makeManager = Effect.gen(function* () {
       );
     });
 
-  const send = (id: string, text: string) =>
+  const send = (id: string, text: string, replyTo?: string) =>
     Effect.suspend((): Effect.Effect<void, SendError> => {
       const entry = entries.get(id);
       if (!entry || disposed) {
         return new SendError({
           message: `Subagent "${id}" is no longer tracked.`,
+        });
+      }
+      if (!text.trim())
+        return new SendError({ message: "Provide a nonempty message." });
+      if (replyTo && entry.snapshot.pendingQuestion?.id !== replyTo) {
+        return new SendError({
+          message: `Question ${replyTo} is no longer awaiting a reply from ${id}.`,
         });
       }
       // Restarting a settled subagent occupies a running slot again, so it
@@ -605,7 +641,7 @@ const makeManager = Effect.gen(function* () {
         // both pass the check in that window. Cleared by RunStarted/settle,
         // or here when the backend rejects the send.
         entry.restarting = true;
-        return entry.session.send(text).pipe(
+        return entry.session.send(text, replyTo).pipe(
           Effect.onError(() =>
             Effect.sync(() => {
               entry.restarting = false;
@@ -613,7 +649,18 @@ const makeManager = Effect.gen(function* () {
           ),
         );
       }
-      return entry.session.send(text);
+      return entry.session.send(text, replyTo).pipe(
+        Effect.tap(() =>
+          Effect.sync(() => {
+            // The backend's acknowledgement precedes its queued state event. A
+            // subsequent wait must not return the question we just answered.
+            if (replyTo && entry.snapshot.pendingQuestion?.id === replyTo) {
+              entry.snapshot.pendingQuestion = undefined;
+              notify(id);
+            }
+          }),
+        ),
+      );
     });
 
   const disposeAll = Effect.gen(function* () {
@@ -661,7 +708,11 @@ const makeManager = Effect.gen(function* () {
       };
     },
     requestSend: (id, text) => {
-      runDetached(send(id, text).pipe(Effect.ignore));
+      runDetached(
+        send(id, text, entries.get(id)?.snapshot.pendingQuestion?.id).pipe(
+          Effect.ignore,
+        ),
+      );
     },
     requestAbort: (id) => {
       const entry = entries.get(id);
@@ -672,6 +723,9 @@ const makeManager = Effect.gen(function* () {
     },
     setOnSettled: (hook) => {
       onSettled = hook;
+    },
+    setOnQuestion: (hook) => {
+      onQuestion = hook;
     },
   };
 

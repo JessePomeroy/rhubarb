@@ -25,3 +25,8 @@ bin/
 # Editors
 .vscode/
 .idea/
+
+# Local model endpoints and Python caches
+/models.json
+__pycache__/
+*.pyc

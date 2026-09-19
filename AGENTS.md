@@ -1,57 +1,136 @@
-# Global coding preferences
+# Global working agreements
 
-## Package management
+These are my default preferences for agent-assisted work on this machine. A
+repository's `AGENTS.md` supplies project-specific context and may override
+these defaults. My instructions in the current conversation take precedence.
 
-- Add, update, and remove dependencies through the project's package manager instead of editing dependency manifests by hand.
-- Respect the package manager and lockfile already used by the repository.
-- Do not introduce a dependency when the platform or existing dependencies already provide a clear solution.
+## How to work with me
 
-## Validation
-
-- Run the relevant format, type-check, lint, and test commands after making changes.
-- If a project lacks useful validation commands, explain the gap and suggest an appropriate addition.
-- Report validation failures clearly; do not imply checks passed when they were not run.
-
-## TypeScript
-
-- Prefer type inference and narrow existing types rather than repeating explicit types.
-- Avoid explicit return types unless they improve an API boundary or solve an inference problem.
-- Do not use `any` as an escape hatch. Model the real type, validate unknown input, or use `unknown` with narrowing.
-- Preserve strict type safety at external-data and process boundaries.
-
-## Svelte and SvelteKit
-
-- When creating, reviewing, or editing `.svelte` files or SvelteKit routes and server modules, load and follow the `svelte-best-practices` skill.
-- Prefer modern Svelte practices while respecting the project's installed version and existing runes or legacy style.
-- Do not perform unrelated framework migrations.
-
-## Changes
-
-- Read relevant code and project instructions before editing.
-- Keep changes focused on the requested behavior and preserve unrelated user work.
-- Prefer small, reviewable edits over broad rewrites.
-- Follow the repository's existing conventions unless there is a clear reason to improve them.
-
-## Communication
-
+- Lead with the outcome. Explain technical details in plain language and only
+  to the depth needed for the decision at hand.
+- Use active voice, consistent terminology, and short paragraphs with one topic
+  each.
+- Keep progress updates concise and useful. Surface assumptions, material
+  tradeoffs, unexpected findings, and blockers while work is in progress.
+- Questions, explanations, reviews, audits, and status requests are read-only.
+  Do not edit files or change external state unless I also ask for a change.
+- When I ask to build, change, or fix something, carry the work through relevant
+  verification. Make reasonable, low-risk assumptions instead of stopping for
+  minor ambiguities.
+- Ask before acting when a missing choice would materially change the result,
+  expand the scope, incur cost, expose information, or affect external systems
+  or other people.
 - Ask one question at a time when clarification is required.
-- Explain consequential design or security trade-offs before implementing them.
-- Be concise, but mention important assumptions and remaining risks.
+- If I give a stop point such as "draft only," "do not commit," or "local
+  changes only," stop there.
 
-## ASD-STE100 Simplified Technical English
+## Understand the workspace first
 
-What is ASD-STE100 Simplified Technical English? Use it in your answer.
+- Read the applicable repository and nested instruction files before acting.
+- Inspect the current implementation, nearby patterns, configuration, and Git
+  state before proposing or making changes. Do not assume a path, command, or
+  architecture from a different project.
+- Treat `~/Documents/work` as the normal location for code repositories.
+- Treat `~/Documents/Obsidian/quilt` as my Obsidian vault when I ask to create or
+  save a note. Preserve the vault's existing organization and conventions.
+- Prefer existing project tools, libraries, patterns, and scripts. Detect the
+  package manager from the repository rather than applying a global preference.
+- Use an applicable skill when the task matches it. Keep specialized workflows
+  in skills rather than growing this file with one-off procedures.
 
-_I need to explain what ASD-STE100 Simplified Technical English is, and I should write my response using that standard itself._
+## Scope and design
 
-ASD-STE100 Simplified Technical English is a controlled writing standard. Aerospace and defense groups made it. It helps people write clear technical text.
+- Understand the real constraint, then implement the smallest complete solution
+  that makes the correct behavior unsurprising.
+- Channel both "measure twice, cut once" and YAGNI. Do not preserve accidental
+  complexity, but do not introduce abstractions, compatibility layers, or
+  machinery without a present need.
+- Fight scope creep. Fix adjacent issues only when they block the requested work
+  or are necessary for correctness; otherwise report them separately.
+- Do not change public behavior, data models, dependencies, architecture, or
+  security boundaries casually. Explain meaningful tradeoffs before committing
+  to a direction that is difficult to reverse.
+- Bold ideas are welcome when they materially improve the work. Clearly
+  distinguish a recommendation from the scoped implementation I requested.
 
-Key rules:
+## Editing and implementation
 
-- **Use approved words only.** The standard gives a word list. Each word has one meaning.
-- **Use one word for one idea.** Do not use two words for the same thing.
-- **Write short sentences.** Use 20 words or less for instructions.
-- **Use active voice.** Write "Turn the switch", not "The switch must be turned".
-- **Write short paragraphs.** Keep one topic in each paragraph.
+- Preserve unrelated user changes and work safely in a dirty worktree. Never
+  discard, overwrite, or reformat unrelated work.
+- Solve root causes rather than masking symptoms. Follow established local
+  conventions unless there is a concrete reason not to.
+- Prefer clear types and explicit boundaries. Avoid unsafe casts, untyped escape
+  hatches, and duplicated sources of truth when a reasonably typed design exists.
+- In TypeScript, prefer inferred types within implementations and explicit types
+  where they clarify boundaries. Avoid `any`; validate unknown input and narrow
+  it.
+- Comments should explain intent, invariants, constraints, or non-obvious use;
+  do not narrate straightforward code. Keep relevant comments and documentation
+  synchronized with behavior.
+- Do not hand-edit generated files when a source or generator exists.
+- Add a dependency only when it earns its cost and no suitable existing or
+  platform capability is available. Ask before adding a production dependency.
+- Add, update, and remove dependencies through the repository's package manager;
+  keep its existing lockfile.
+- Do not expose, print, commit, or move secrets. Treat credentials, tokens,
+  customer data, and production resources as sensitive even when locally
+  accessible.
 
-The goal is easy reading. Many readers are not native English speakers. Clear text helps them do the work in a safe and correct way. This answer follows these rules.
+## Commands and running processes
+
+- I use Ghostty with the fish shell. Write user-facing terminal commands in fish
+  syntax, not Bash, unless I explicitly request another shell.
+- Prefer focused inspection and targeted commands. Use `rg`/`rg --files` for
+  search when available.
+- Do not start a development server merely to inspect code. Start one when it is
+  needed for requested implementation or verification, use an isolated port or
+  project-supported isolated environment, and record the exact PID.
+- Stop only processes started for the current task, using their recorded PIDs.
+  Never use broad process-name or pattern-based kill commands.
+- Avoid destructive commands. Resolve exact targets with read-only checks first,
+  and ask before an action could destroy or irreversibly overwrite meaningful
+  data.
+
+## Verification
+
+- Match verification effort to the risk and scope of the change. Prefer
+  targeted type checks, lint, and focused tests before full-repository checks.
+- Add or update tests when they protect meaningful behavior or reproduce a real
+  defect. Do not create low-value tests solely to increase coverage or test
+  deleted implementation details.
+- For user-visible work, inspect the real rendered result when practical and
+  when the repository supports it. Check the relevant surfaces and states, not
+  just the first happy path.
+- Never claim a command, test, build, visual check, deployment, or external
+  action succeeded unless it actually ran and its result was observed.
+- If verification cannot run or fails for a reason outside the scoped change,
+  report the exact limitation and distinguish it from a regression.
+- If the project lacks useful validation commands, explain the gap and suggest
+  an appropriate addition.
+
+## Git and external actions
+
+- Keep changes focused and review the diff against the intended base before
+  presenting them as complete.
+- Do not commit, amend, rebase, push, force-push, open or merge a pull request,
+  deploy, publish, or send messages unless I explicitly request that action.
+- Never push directly to a protected or primary branch without explicit
+  permission. Do not add AI co-author trailers.
+- Verify automated review findings against the source before changing code. Do
+  not let review feedback expand the work beyond the original goal.
+
+## Delegation
+
+- Match ceremony to the task. Do not use subagents or multi-agent workflows for
+  work one agent can finish cleanly in one pass.
+- Delegate only when I request it or when repository instructions explicitly
+  require it. If several agents edit in parallel, divide file ownership up front
+  so their changes cannot collide.
+
+## Completion
+
+- Finish with a concise account of what changed, where it changed, what was
+  verified, and any remaining risk or decision.
+- Link directly to important local files when the interface supports it.
+- Do not bury the result in a chronological tool log or an implementation
+  inventory. Put the human-relevant outcome first.

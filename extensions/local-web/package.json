@@ -1,0 +1,15 @@
+{
+  "name": "local-web",
+  "version": "1.0.0",
+  "description": "Local SearXNG, Crawl4AI and Playwright MCP tools for Pi",
+  "scripts": {
+    "test": "node --test *.test.ts",
+    "check": "tsc --noEmit -p tsconfig.json"
+  },
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0"
+  },
+  "private": true
+}

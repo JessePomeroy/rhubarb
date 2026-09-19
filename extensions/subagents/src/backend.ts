@@ -42,7 +42,7 @@ export interface SubagentSession {
    * Steer the active run, or start a fresh run when idle (v1 `manager.send`
    * semantics — the "is a run active" decision is backend-native state).
    */
-  send(text: string): Effect.Effect<void, SendError>;
+  send(text: string, replyTo?: string): Effect.Effect<void, SendError>;
   /**
    * Interrupt the active run. Resolves once the backend acknowledges; the
    * corresponding RunSettled(Interrupted) arrives on `events`. Callers bound

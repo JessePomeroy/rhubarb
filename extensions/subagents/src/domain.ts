@@ -36,6 +36,11 @@ export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
 export type SubagentStatus = "running" | "done" | "error";
 
+export interface ParentQuestion {
+  readonly id: string;
+  readonly question: string;
+}
+
 /** Parent-session context resolved by the tool layer and passed opaquely. */
 export interface ParentContext {
   readonly parentCwd: string;
@@ -140,6 +145,10 @@ export type RunOutcome =
 export type SubagentEvent =
   // lifecycle (a session can run multiple turns via send())
   | { readonly _tag: "RunStarted" }
+  | {
+      readonly _tag: "ParentQuestionChanged";
+      readonly question?: ParentQuestion;
+    }
   | { readonly _tag: "RunSettled"; readonly outcome: RunOutcome }
   // transcript building blocks
   | { readonly _tag: "UserMessage"; readonly text: string }
@@ -201,6 +210,8 @@ export interface SubagentSnapshot {
   readonly prompt: string;
   readonly cwd: string;
   readonly status: SubagentStatus;
+  /** Still occupies a running slot, but is waiting for a correlated parent reply. */
+  readonly pendingQuestion?: ParentQuestion;
   readonly createdAt: number;
   readonly settledAt?: number;
   readonly errorText?: string;

@@ -9,7 +9,9 @@ Rhubarb is designed to be the active pi configuration directory at `~/.pi/agent`
 - Git
 - [pi](https://pi.dev)
 - Codex CLI for Codex subagents
-- A Firecrawl API key for web research
+- Docker and a Linux user systemd session for the optional local web stack
+- Python 3 for local service management and analysis skills
+- A Firecrawl API key only if you opt into its paid fallback
 - GitHub CLI for pull-request information
 - `wl-clipboard` on Wayland Linux for `/copy-all`
 
@@ -19,7 +21,7 @@ Rhubarb is designed to be the active pi configuration directory at `~/.pi/agent`
 
 Pi stores credentials and sessions inside `~/.pi/agent`, so back it up before cloning:
 
-```bash
+```fish
 mv ~/.pi/agent ~/.pi/agent.backup
 git clone https://github.com/JessePomeroy/rhubarb.git ~/.pi/agent
 cd ~/.pi/agent
@@ -28,7 +30,7 @@ npm install
 
 Restore only private runtime files you want to keep:
 
-```bash
+```fish
 cp ~/.pi/agent.backup/auth.json ~/.pi/agent/auth.json
 cp -a ~/.pi/agent.backup/sessions ~/.pi/agent/sessions
 ```
@@ -37,11 +39,37 @@ If this is a new pi installation, omit those copies and authenticate with `/logi
 
 Do not copy an old `settings.json` over rhubarb's tracked settings unless you intend to merge its values manually.
 
-## Firecrawl
+## Local web tools
+
+Follow [the local web setup guide](services/local-web/README.md) to install the
+extension-local dependencies, browser runtime, and start the localhost services.
+Search and extraction use SearXNG/Crawl4AI by default; browsing uses Playwright MCP.
+Firecrawl is disabled unless explicitly enabled.
+
+## Shared skills and personal settings
+
+This repository contains regular-file snapshots of the author's shared skills and
+AGENTS.md, so a clone does not depend on personal symlink targets. The author's
+active installation keeps those symlinks; Git may therefore show local type changes
+and apparent missing skill files even after a snapshot is committed. Do not reset
+or overwrite those links to clean the status. Refresh published snapshots from the
+canonical files when sharing future changes.
+
+Review AGENTS.md's personal preferences and paths before using them. Select a model
+available in your own account with Pi's model picker; tracked settings reflect the
+author's current setup. Local `models.json` is not published.
+
+PDF reading needs Poppler (`pdfinfo`, `pdftotext`, `pdftoppm`). YouTube captions need
+`yt-dlp` (for example, `uv tool install yt-dlp`). Session analysis uses standard
+Python only. These skills do not require paid extraction/transcription APIs.
+See [subagent controls](extensions/subagents/README.md) for Herdr pane controls and
+parent/child communication. Herdr is optional; the in-Pi manager works without it.
+
+## Optional Firecrawl fallback
 
 Create the ignored private environment file:
 
-```bash
+```fish
 cp ~/.pi/agent/.env.example ~/.pi/agent/.env
 chmod 600 ~/.pi/agent/.env
 ```
@@ -53,6 +81,7 @@ FIRECRAWL_API_KEY=fc-your-key
 ```
 
 The extension also accepts `FIRECRAWL_API_KEY` from the process environment.
+Start Pi with `env PI_ENABLE_FIRECRAWL=1 pi` to expose the fallback tools.
 
 ## Optional system integrations
 
@@ -60,7 +89,7 @@ The extension also accepts `FIRECRAWL_API_KEY` from the process environment.
 
 On Arch/CachyOS:
 
-```bash
+```fish
 sudo pacman -S --needed wl-clipboard
 ```
 
@@ -70,7 +99,7 @@ Other Linux clipboard fallbacks are `xclip` and `xsel`. macOS uses `pbcopy`; Win
 
 Install and authenticate GitHub CLI:
 
-```bash
+```fish
 gh auth login
 gh auth status
 ```
@@ -81,7 +110,7 @@ Install Codex CLI and authenticate it normally. Rhubarb discovers `codex` from `
 
 ## Validate
 
-```bash
+```fish
 cd ~/.pi/agent
 npm run format:check
 npm run check
@@ -95,7 +124,7 @@ Start pi or run `/reload` in an existing interactive session. The Catppuccin the
 
 Because `settings.json` and `AGENTS.md` are tracked, review local changes before pulling:
 
-```bash
+```fish
 cd ~/.pi/agent
 git status
 git pull --ff-only
@@ -124,7 +153,7 @@ Never commit API keys or authentication files.
 
 If an extension prevents normal startup, launch pi with extensions disabled:
 
-```bash
+```fish
 pi --no-extensions
 ```
 
@@ -132,7 +161,7 @@ Then inspect changes, run the validation suite, or temporarily disable resources
 
 To restore the previous installation completely:
 
-```bash
+```fish
 mv ~/.pi/agent ~/.pi/agent.failed
 mv ~/.pi/agent.backup ~/.pi/agent
 ```

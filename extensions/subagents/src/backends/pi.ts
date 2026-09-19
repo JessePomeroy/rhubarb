@@ -37,6 +37,10 @@ import type {
 } from "../domain.ts";
 import { SendError, SpawnError } from "../domain.ts";
 import { usageFromMessages } from "../../../shared/model-usage.ts";
+import {
+  createParentChannel,
+  parentQuestionTool,
+} from "../parent-communication.ts";
 
 const CHILD_SHUTDOWN_TIMEOUT_MS = 5_000;
 const CHILD_TOOL_CALL_TIMEOUT_MS = 3 * 60 * 1_000;
@@ -56,6 +60,7 @@ const CHILD_EXCLUDED_TOOL_NAMES = [
   "subagent_cancel",
   "subagent_check",
   "subagent_list",
+  "subagent_message",
   "workflow",
   "ask_user",
 ] as const;
@@ -207,6 +212,9 @@ function createToolCallTimeoutGuard(timeoutMs = CHILD_TOOL_CALL_TIMEOUT_MS) {
   return {
     apply(session: AgentSession) {
       for (const { name } of session.getAllTools()) {
+        // Waiting for a parent decision is not a hung tool. Cancellation and
+        // session teardown still release the pending question.
+        if (name === "ask_parent") continue;
         const definition = session.getToolDefinition(name);
         if (definition) wrap(definition);
       }
@@ -347,6 +355,14 @@ const makePiSession = (
     const thinkingLevel = (task.reasoningEffort ??
       task.parent.inheritedThinkingLevel) as ThinkingLevel | undefined;
 
+    const events = yield* Queue.make<SubagentEvent, Cause.Done>();
+    const emit = (event: SubagentEvent) => {
+      Queue.offerUnsafe(events, event);
+    };
+    const parentChannel = createParentChannel((question) =>
+      emit({ _tag: "ParentQuestionChanged", question }),
+    );
+
     const session = yield* Effect.tryPromise({
       try: async () => {
         const { loader, settingsManager } = await createChildResources(
@@ -362,6 +378,8 @@ const makePiSession = (
           model,
           thinkingLevel,
           excludeTools: [...CHILD_EXCLUDED_TOOL_NAMES],
+          customTools:
+            task.origin === "btw" ? [] : [parentQuestionTool(parentChannel)],
         });
         // Start child extension session hooks/resources in headless mode.
         // A rejection here would otherwise leak the freshly created session:
@@ -384,11 +402,6 @@ const makePiSession = (
       /** One terminal event per run: lifecycle, prompt-rejection, and abort
        * fallbacks can all race to settle; the first wins. */
       settled: false,
-    };
-
-    const events = yield* Queue.make<SubagentEvent, Cause.Done>();
-    const emit = (event: SubagentEvent) => {
-      Queue.offerUnsafe(events, event);
     };
 
     const toolTimeout = createToolCallTimeoutGuard();
@@ -561,6 +574,7 @@ const makePiSession = (
     yield* Effect.addFinalizer(() =>
       Effect.promise(async () => {
         state.closed = true;
+        parentChannel.close();
         unsubscribe();
         try {
           session.clearQueue();
@@ -599,10 +613,21 @@ const makePiSession = (
     return {
       meta: Effect.sync(currentMeta),
       events: Stream.fromQueue(events),
-      send: (text) =>
+      send: (text, replyTo) =>
         Effect.suspend((): Effect.Effect<void, SendError> => {
           if (state.closed) {
             return new SendError({ message: "Subagent session is closed." });
+          }
+          if (replyTo) {
+            return Effect.try({
+              try: () => parentChannel.reply(replyTo, text),
+              catch: (error) => new SendError({ message: boundedError(error) }),
+            });
+          }
+          if (parentChannel.pending) {
+            return new SendError({
+              message: `Reply to pending question ${parentChannel.pending.id} before steering this child.`,
+            });
           }
           if (session.isStreaming) {
             // Steer the active run via the SDK's queue; queue_update events

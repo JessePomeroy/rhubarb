@@ -178,5 +178,17 @@ export function buildTranscriptLines(
     }
   }
 
+  if (snap.pendingQuestion) {
+    out.push(
+      "",
+      theme.fg(
+        "warning",
+        `Waiting for parent (${snap.pendingQuestion.id}); type below to answer:`,
+      ),
+    );
+    out.push(
+      ...wrapTextWithAnsi(sanitizeText(snap.pendingQuestion.question), width),
+    );
+  }
   return out;
 }
