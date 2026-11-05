@@ -48,9 +48,13 @@ Firecrawl is disabled unless explicitly enabled.
 
 ## Shared skills and personal settings
 
-To use these files across multiple agents, follow the
-[shared global configuration guide](GLOBAL-CONFIG.md). It covers copying complete
-skill packages, merging existing instructions, symlink discovery, and safe updates.
+For the broader agent-neutral suite, use a separate [Iced Coffee Suite](https://github.com/JessePomeroy/iced-coffee-suite) checkout and
+its catalog, personal instruction template, and preview-first installer. Rhubarb
+remains the Pi extension/runtime configuration. The
+[shared global configuration guide](GLOBAL-CONFIG.md) explains how to connect
+selected companion skills, preserve existing packages and instructions, verify
+discovery, and remove matching links safely. Neither checkout updates the other
+or migrates the author's live shared configuration automatically.
 
 This repository contains regular-file snapshots of the author's shared skills and
 AGENTS.md, so a clone does not depend on personal symlink targets. The author's
@@ -63,6 +67,7 @@ Review AGENTS.md's personal preferences and paths before using them. Select a mo
 available in your own account with Pi's model picker; tracked settings reflect the
 author's current setup. Local `models.json` is not published.
 
+Installing a skill supplies instructions and helpers, not its external tools.
 PDF reading needs Poppler (`pdfinfo`, `pdftotext`, `pdftoppm`). YouTube captions need
 `yt-dlp` (for example, `uv tool install yt-dlp`). Session analysis uses standard
 Python only. These skills do not require paid extraction/transcription APIs.
