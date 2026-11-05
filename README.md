@@ -37,6 +37,15 @@ This project is being built intentionally from pi's public extension APIs and do
 - [Architecture and usage](ARCHITECTURE.md)
 - [Local web services: startup, configuration, verification](services/local-web/README.md)
 
+## Agent-neutral skills
+
+The broader shared suite is maintained as a separate [Iced Coffee Suite](https://github.com/JessePomeroy/iced-coffee-suite) distribution,
+with portable packages, a catalog, an instruction template, and a preview-first
+symlink installer. It works without Rhubarb or Pi. Use this repository for Pi's
+extensions and runtime tools; follow the
+[shared configuration guide](GLOBAL-CONFIG.md) to connect a companion skills
+checkout without overwriting an existing installation.
+
 ## Development
 
 ```bash
