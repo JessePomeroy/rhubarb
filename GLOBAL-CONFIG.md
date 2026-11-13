@@ -1,143 +1,112 @@
-# Use rhubarb with shared global configuration
+# Share instructions and skills across agents
 
-The published repository contains ordinary files for `AGENTS.md` and each skill.
-They work in a fresh clone without access to the author's personal folders. The
-author's live installation instead uses symlinks to a separate shared configuration
-folder; those machine-specific links are deliberately not published.
+Rhubarb provides Pi extensions and a small set of bundled skill snapshots. The
+separate [Iced Coffee Suite](https://github.com/JessePomeroy/iced-coffee-suite) distribution contains the broader, agent-neutral suite:
+portable packages, a catalog, a personal instruction template, and a preview-first
+installer. It does not require Rhubarb or Pi.
 
-You can adopt the same arrangement. A skill is a **whole directory**, containing
-`SKILL.md` and potentially scripts, references, assets, and agent metadata. Copy the
-whole directory, not just the Markdown entrypoint.
+Keep the two responsibilities separate: use Rhubarb for its Pi runtime tools, and
+use an [Iced Coffee Suite](https://github.com/JessePomeroy/iced-coffee-suite) checkout when you want to share selected workflows across
+local coding agents. That checkout's `README.md`, `INSTALL.md`, and `docs/CATALOG.md`
+are the installation entrypoints. Keep it at a stable path; installed links point
+back to its files.
 
-## Choose a canonical home
+## Start from an Iced Coffee Suite checkout
 
-For example:
+Obtain the companion checkout separately and inspect its instructions and installer.
+The examples below use zsh-compatible syntax; replace the example path with its
+actual location. Nothing in these examples requires changing Rhubarb's extensions.
 
-```text
-~/Documents/work/agent-config/
-  AGENTS.md
-  skills/
-    pdf-reader/
-      SKILL.md
-      scripts/
-    youtube-transcript/
-    web-debug/
+```zsh
+iced_coffee_suite_dir="$HOME/Documents/work/iced-coffee-suite"
+python3 "$iced_coffee_suite_dir/install.py" --list
+python3 "$iced_coffee_suite_dir/install.py" --agent codex --skill diagnosing-bugs --skill pdf-reader
 ```
 
-Keep a clean rhubarb checkout separately when possible. Copy selected packages from
-that checkout into the canonical home, then link your agents' discovery paths to
-those copies. The canonical copies become your editable source of truth; the clean
-checkout remains a place to review upstream updates.
+The installer previews changes by default. After reviewing the plan, use the same
+selection with `--apply`. It refuses existing files, directories, and unrelated
+symlinks, including broken ones. It does not merge packages, install dependencies,
+connect accounts, or change global instructions unless explicitly requested.
 
-There is no universal configuration path understood by every agent. Common paths
-used by this setup are:
+For Pi, choose `--agent pi`. Repeat `--agent` for multiple local agents, or use
+`--skills-dir` with another tool's documented discovery directory. Avoid linking
+an additional copy if the same package is already discoverable through another root.
 
-| Consumer        | Instructions                              | Skills                              |
-| --------------- | ----------------------------------------- | ----------------------------------- |
-| Pi              | `~/.pi/agent/AGENTS.md`                   | `~/.pi/agent/skills/<name>/`        |
-| Codex           | `~/.codex/AGENTS.md`                      | `~/.agents/skills/<name>/`          |
-| Other harnesses | Their documented instruction setting/path | Their documented skill setting/path |
+| Consumer    | Default skill discovery     | Optional global instruction destination |
+| ----------- | --------------------------- | --------------------------------------- |
+| Codex       | `~/.agents/skills/<name>`   | `~/.codex/AGENTS.md`                    |
+| Claude Code | `~/.claude/skills/<name>`   | `~/.claude/CLAUDE.md`                   |
+| Gemini CLI  | `~/.agents/skills/<name>`   | `~/.gemini/GEMINI.md`                   |
+| Pi          | `~/.pi/agent/skills/<name>` | `~/.pi/agent/AGENTS.md`                 |
 
-Existing `~/.codex/skills/<name>` links may also be used for compatibility. Avoid
-adding duplicate discovery paths unnecessarily, and verify discovery in each
-harness. Shared files do not provide missing tools: `web-debug` uses Pi's browser
-bridge, for example, while `pdf-reader` requires Poppler and `youtube-transcript`
-requires yt-dlp. Pi orchestration skills also need their corresponding extensions.
+Codex and Gemini share a skill root. Existing legacy Codex links may still be
+present; do not add or remove compatibility aliases without checking the actual
+host's discovery behavior. Use custom destinations for nondefault agent homes.
+Local links do not make skills available in remote or cloud sessions.
 
-## Copy and link a skill safely
+## Personalize the global agreements
 
-These commands use **fish** on Linux. Run them from your rhubarb checkout and change
-`skill_name` for each package you want. They intentionally refuse to replace an
-existing canonical package or discovery path, including broken symlinks.
+The companion repo's `instructions/AGENTS.example.md` is the template for personal
+working agreements. Its root `AGENTS.md` is for maintaining that repository and
+must not be installed globally.
 
-```fish
-set repo (pwd)
-set shared "$HOME/Documents/work/agent-config"
-set skill_name pdf-reader
+Read existing agreements and merge the desired defaults into a personal file.
+Adapt shell, workspace, business, and vault settings rather than adopting the
+author's preferences wholesale. Preserve the original files. Keep project-specific
+instructions in their projects and private settings outside version control.
 
-set source "$repo/skills/$skill_name"
-set canonical "$shared/skills/$skill_name"
-set pi_link "$HOME/.pi/agent/skills/$skill_name"
-set shared_link "$HOME/.agents/skills/$skill_name"
+Once the personalized file exists, preview its links, for example:
 
-if not test -f "$source/SKILL.md"
-    echo "Run from the rhubarb checkout and choose an existing skill."
-else if test -e "$canonical"; or test -L "$canonical"
-    echo "Canonical skill already exists; compare and merge it first."
-else if test -e "$pi_link"; or test -L "$pi_link"
-    echo "Pi skill already exists; back it up before replacing it."
-else if test -e "$shared_link"; or test -L "$shared_link"
-    echo "Shared discovery path already exists; inspect it first."
-else
-    mkdir -p "$shared/skills" "$HOME/.pi/agent/skills" "$HOME/.agents/skills"
-    if cp -aL "$source" "$canonical"
-        if diff -qr "$source" "$canonical"
-            ln -sT "$canonical" "$pi_link"
-            ln -sT "$canonical" "$shared_link"
-        end
-    end
-end
+```zsh
+python3 "$iced_coffee_suite_dir/install.py" --agent codex --agent pi \
+  --instructions "$iced_coffee_suite_dir/instructions/AGENTS.local.md"
 ```
 
-If rhubarb is already installed at `~/.pi/agent`, its skill directory is also the
-source, so the example correctly stops at the existing Pi path. In that case:
+The example personal filename is ignored by the companion repo. Add `--apply`
+within the user's authorization after inspecting the plan. If a destination already
+exists, the installer stops: compare/merge it and preserve a backup before any
+separately authorized replacement. Never copy onto an existing instruction symlink;
+that can overwrite the canonical shared file.
 
-1. Copy the complete skill to the canonical folder and compare both copies.
-2. Move the original Pi skill directory to a unique backup location outside the
-   checkout. Preserve any personal edits before doing so.
-3. Create the Pi symlink at the now-vacant path, and the shared discovery link if
-   that path is also vacant.
+## Existing Rhubarb installations
 
-Do not copy onto an existing symlink, delete an existing package, or run a recursive
-merge blindly. Inspect existing targets with `readlink -f` and compare their contents.
-Use `ln -sT` only after checking that the destination is vacant; never add `-f` as
-an automatic conflict resolution.
+The published Rhubarb repository contains ordinary-file snapshots of its bundled
+skills and instructions. A fresh clone does not depend on the author's home paths.
+The author's live installation instead links selected files to a separate canonical
+`agent-config` folder. The new portable checkout does not migrate those live links
+or change that folder automatically.
 
-Reload Pi after active child work finishes. Start a new session in other harnesses
-as needed and verify that the skill is listed once and that its helper scripts run.
+If Rhubarb already occupies `~/.pi/agent`, a bundled skill directory or existing
+shared link can conflict with a requested companion install. That is expected.
+Compare the complete packages, preserve local changes, and explicitly choose which
+copy will be canonical before replacing anything. Do not recursively merge or
+force a link merely to get a clean installer result.
 
-## Share global instructions
+A skill is its whole directory: `SKILL.md`, scripts, references, assets, and optional
+agent metadata. Copying just the entrypoint can leave a skill discoverable but broken.
+Shared instructions do not supply missing tools. PDF reading needs Poppler,
+YouTube captions need yt-dlp, browser work needs the active harness's actual browser
+tools, and Rhubarb's orchestration skills need its corresponding extensions.
 
-Read rhubarb's `AGENTS.md` before adopting it: it contains the author's preferences,
-including shell, repository locations, Obsidian paths, and approval boundaries.
-Adapt those to your own workflow.
+## Verify, update, and remove
 
-If you already have global instructions, merge the agreements you want into your
-canonical `AGENTS.md`; do not replace them wholesale. Preserve repository-specific
-instructions inside each project rather than moving them into the global file.
+Run the same companion selection with `--check` to verify link targets. Then reload
+Pi after active child work finishes, or start a fresh session in another agent.
+Confirm discovery and exercise a relevant read-only workflow. Link checks alone do
+not prove that an agent loaded the skill or that optional services are available.
 
-After reviewing the merged file and backing up existing global instruction files,
-link each now-vacant discovery path to the canonical file. For example, in fish:
+Review Git state and incoming changes before updating either checkout. Pulling
+Rhubarb does not update independent canonical copies or the companion repo. Updating
+the companion changes the files its linked agents read after an appropriate reload.
+Preserve personal edits rather than replacing a maintained edition by name.
 
-```fish
-set canonical "$HOME/Documents/work/agent-config/AGENTS.md"
-# Run each command only after its destination has been inspected and backed up.
-ln -sT "$canonical" "$HOME/.pi/agent/AGENTS.md"
-ln -sT "$canonical" "$HOME/.codex/AGENTS.md"
-```
+To remove companion links, repeat their original selection with `--remove`, preview
+it, then add `--apply` when authorized. Only selected symlinks still pointing at the
+expected sources are removed. Source packages and personalized agreements are kept.
+Restore any saved pre-install configuration separately after inspecting it.
 
-These commands are examples, not a request to replace existing files. They require
-the canonical file and parent directories to exist and intentionally omit force.
-
-## Updates and Git status
-
-Copying a skill creates an independent snapshot. Pulling rhubarb does **not** update
-your global copy. Review the upstream diff in the clean checkout, compare it with
-your canonical package, and merge desired changes there. All linked agents then
-read the same updated files after their appropriate reload.
-
-When the active Pi directory is itself the rhubarb Git checkout, replacing tracked
-files/directories with symlinks causes expected Git differences: type changes,
-apparent deleted skill files, and untracked directory symlinks. Do not use
-`git reset --hard`, `git clean`, or forced checkout to hide these differences. Do
-not stage the links with a blanket `git add --all` and publish absolute home paths.
-For publication, export regular-file snapshots into a clean checkout or deliberately
-stage the canonical contents while preserving the live links.
-
-Before pulling changes into such an active checkout, inspect both Git state and
-link targets. A separate clean checkout is the simpler place to compare upstream
-changes without disturbing a running configuration.
-
-To undo global sharing, back up your canonical data, confirm each discovery entry
-is the symlink you created, remove only that link, and restore its saved original
-file or package. Keep the canonical directory until all consumers are accounted for.
+When an active Pi directory is also a Git checkout, machine-specific links can
+appear as type changes, deleted tracked skill files, and untracked directory links.
+Do not use a forced checkout, `git reset --hard`, `git clean`, or blanket staging to
+hide or publish them. Use a clean checkout when preparing regular-file snapshots
+for publication. Preserve live links and unrelated working changes.
